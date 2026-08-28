@@ -47,3 +47,18 @@ def test_set_agent_status_rejects_unknown_agent() -> None:
             "nonexistent",
             "IN_PROGRESS",
         )
+
+
+def test_set_agent_status_rejects_forbidden_transition() -> None:
+    state = {
+        "agents": {
+            "product": {"status": "READY"},
+        }
+    }
+
+    with pytest.raises(ValueError):
+        set_agent_status(
+            state,
+            "product",
+            "COMPLETED",
+        )
