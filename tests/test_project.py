@@ -55,6 +55,8 @@ def test_initial_state_is_valid_yaml(tmp_path: Path) -> None:
     with state_path.open("r", encoding="utf-8") as file:
         state = yaml.safe_load(file)
 
+    assert state["project"]["id"] == "rideflow"
+    assert state["project"]["name"] == "RideFlow"
     assert state["factory_version"] == "1.0"
     assert state["project"]["phase"] == "discovery"
     assert state["agents"]["product"]["status"] == "READY"
