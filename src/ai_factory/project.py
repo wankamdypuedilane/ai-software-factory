@@ -1,5 +1,6 @@
 from pathlib import Path
-from shutil import copyfile
+
+from ai_factory.state import load_state, save_state
 
 
 def initialize_project(project_name: str, target_dir: Path) -> Path:
@@ -23,9 +24,13 @@ def initialize_project(project_name: str, target_dir: Path) -> Path:
         / "state.yaml"
     )
 
+    state = load_state(template_path)
+
+    state["project"]["id"] = project_id
+    state["project"]["name"] = project_name
+
     state_path = factory_dir / "state.yaml"
 
-    copyfile(template_path, state_path)
+    save_state(state_path, state)
 
     return project_root
-
