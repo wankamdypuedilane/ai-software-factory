@@ -66,6 +66,11 @@ def main() -> None:
         help="Display the current Factory project status",
     )
 
+    subparsers.add_parser(
+        "next",
+        help="Display the next agent that should work",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -83,6 +88,17 @@ def main() -> None:
 
     elif args.command == "status":
         show_status(Path.cwd())
+
+    elif args.command == "next":
+        state_path = Path.cwd() / ".factory" / "state.yaml"
+        state = load_state(state_path)
+
+        next_agent = get_next_agent(state)
+
+        if next_agent:
+            print(next_agent)
+        else:
+            print("none")
 
 
 if __name__ == "__main__":
