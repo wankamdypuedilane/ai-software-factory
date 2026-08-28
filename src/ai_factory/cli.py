@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+from ai_factory.approvals import approve
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.state import load_state, save_state
@@ -87,6 +88,16 @@ def main() -> None:
         help="New agent status",
     )
 
+    approve_parser = subparsers.add_parser(
+        "approve",
+        help="Record an explicit human approval",
+    )
+
+    approve_parser.add_argument(
+        "approval_name",
+        help="Approval to record",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -134,6 +145,25 @@ def main() -> None:
             )
 
         except (ValueError, KeyError) as error:
+            parser.error(str(error))
+
+    elif args.command == "approve":
+        state_path = Path.cwd() / ".factory" / "state.yaml"
+        state = load_state(state_path)
+
+        try:
+            state = approve(
+                state,
+                args.approval_name,
+            )
+
+            save_state(state_path, state)
+
+            print(
+                f"Human approval recorded: {args.approval_name}"
+            )
+
+        except ValueError as error:
             parser.error(str(error))
 
 
