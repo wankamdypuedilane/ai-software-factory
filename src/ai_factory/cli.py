@@ -3,7 +3,8 @@ from pathlib import Path
 
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
-from ai_factory.state import load_state
+from ai_factory.state import load_state, save_state
+from ai_factory.transitions import set_agent_status
 
 
 def show_status(project_root: Path) -> None:
@@ -71,6 +72,21 @@ def main() -> None:
         help="Display the next agent that should work",
     )
 
+    set_status_parser = subparsers.add_parser(
+        "set-status",
+        help="Update the status of an agent",
+    )
+
+    set_status_parser.add_argument(
+        "agent_name",
+        help="Agent name",
+    )
+
+    set_status_parser.add_argument(
+        "status",
+        help="New agent status",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -99,6 +115,26 @@ def main() -> None:
             print(next_agent)
         else:
             print("none")
+
+    elif args.command == "set-status":
+        state_path = Path.cwd() / ".factory" / "state.yaml"
+        state = load_state(state_path)
+
+        try:
+            state = set_agent_status(
+                state,
+                args.agent_name,
+                args.status,
+            )
+
+            save_state(state_path, state)
+
+            print(
+                f"{args.agent_name} status updated to {args.status}"
+            )
+
+        except (ValueError, KeyError) as error:
+            parser.error(str(error))
 
 
 if __name__ == "__main__":
