@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.state import load_state
 
@@ -20,6 +21,15 @@ def show_status(project_root: Path) -> None:
 
     for agent_name, agent_data in agents.items():
         print(f"{agent_name:<12} {agent_data['status']}")
+
+    next_agent = get_next_agent(state)
+
+    print()
+
+    if next_agent:
+        print(f"Next agent: {next_agent}")
+    else:
+        print("Next agent: none")
 
 
 def main() -> None:
