@@ -1,0 +1,62 @@
+from pathlib import Path
+
+import yaml
+
+from ai_factory.project import initialize_project
+
+
+def test_initialize_project_creates_factory_state(tmp_path: Path) -> None:
+    project_root = initialize_project(
+        project_name="RideFlow",
+        target_dir=tmp_path,
+    )
+
+    state_path = project_root / ".factory" / "state.yaml"
+
+    assert project_root.exists()
+    assert state_path.exists()
+
+
+def test_initialize_project_uses_normalized_project_id(tmp_path: Path) -> None:
+    project_root = initialize_project(
+        project_name="Ride Flow",
+        target_dir=tmp_path,
+    )
+
+    assert project_root.name == "ride-flow"
+
+
+def test_initialize_project_fails_if_project_exists(tmp_path: Path) -> None:
+    initialize_project(
+        project_name="RideFlow",
+        target_dir=tmp_path,
+    )
+
+    try:
+        initialize_project(
+            project_name="RideFlow",
+            target_dir=tmp_path,
+        )
+
+        assert False, "Expected FileExistsError"
+
+    except FileExistsError:
+        pass
+
+
+def test_initial_state_is_valid_yaml(tmp_path: Path) -> None:
+    project_root = initialize_project(
+        project_name="RideFlow",
+        target_dir=tmp_path,
+    )
+
+    state_path = project_root / ".factory" / "state.yaml"
+
+    with state_path.open("r", encoding="utf-8") as file:
+        state = yaml.safe_load(file)
+
+    assert state["factory_version"] == "1.0"
+    assert state["project"]["phase"] == "discovery"
+    assert state["agents"]["product"]["status"] == "READY"
+
+    
