@@ -2,6 +2,24 @@ import argparse
 from pathlib import Path
 
 from ai_factory.project import initialize_project
+from ai_factory.state import load_state
+
+
+def show_status(project_root: Path) -> None:
+    """Display the current Factory project status."""
+
+    state_path = project_root / ".factory" / "state.yaml"
+    state = load_state(state_path)
+
+    project = state["project"]
+    agents = state["agents"]
+
+    print(f"Project: {project['name']}")
+    print(f"Phase: {project['phase']}")
+    print()
+
+    for agent_name, agent_data in agents.items():
+        print(f"{agent_name:<12} {agent_data['status']}")
 
 
 def main() -> None:
@@ -33,6 +51,11 @@ def main() -> None:
         help="Name of the project to create",
     )
 
+    subparsers.add_parser(
+        "status",
+        help="Display the current Factory project status",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -48,8 +71,9 @@ def main() -> None:
         except FileExistsError as error:
             parser.error(str(error))
 
+    elif args.command == "status":
+        show_status(Path.cwd())
+
 
 if __name__ == "__main__":
     main()
-
-    
