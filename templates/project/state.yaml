@@ -1,0 +1,45 @@
+factory_version: "1.0"
+
+project:
+  id: ""
+  name: ""
+  phase: discovery
+
+iteration:
+  type: sprint
+  id: sprint-01
+
+agents:
+  product:
+    status: READY
+
+  ux_ui:
+    status: NOT_STARTED
+
+  architect:
+    status: NOT_STARTED
+
+  developer:
+    status: NOT_STARTED
+
+  qa:
+    status: NOT_STARTED
+
+  security:
+    status: NOT_STARTED
+
+  devops:
+    status: NOT_STARTED
+
+  sre:
+    status: NOT_STARTED
+
+approvals:
+  product_scope: false
+  design: false
+  architecture: false
+  production_deployment: false
+
+blockers: []
+
+artifacts: {}
