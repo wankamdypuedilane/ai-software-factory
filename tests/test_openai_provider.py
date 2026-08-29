@@ -126,6 +126,16 @@ def test_openai_provider_run_builds_prompt_and_executes(
     assert "Architect contract" in captured["prompt"]
     assert "Test Project" in captured["prompt"]
     assert "## Required Output Format" in captured["prompt"]
+    assert '"artifact_requests"' in captured["prompt"]
+    assert "Artifact policy:" in captured["prompt"]
+    assert "Do NOT generate large document contents inside this response." in (
+        captured["prompt"]
+    )
+    assert (
+        "Use artifact_requests to declare documents or files that should "
+        "be generated separately by the Factory."
+        in captured["prompt"]
+    )
 
 
 def test_openai_provider_execute_uses_responses_api(

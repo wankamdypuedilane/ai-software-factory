@@ -69,17 +69,26 @@ class OpenAIProvider(ModelProvider):
             + "{\n"
             + '  "status": "COMPLETED | NEEDS_INPUT | BLOCKED | REVIEW_REQUIRED",\n'
             + '  "summary": "short summary",\n'
-            + '  "artifacts": [\n'
+            + '  "artifacts": [],\n'
+            + '  "artifact_requests": [\n'
             + "    {\n"
             + '      "path": "relative/project/path",\n'
-            + '      "content": "artifact content"\n'
+            + '      "purpose": "what this artifact must document or produce"\n'
             + "    }\n"
             + "  ],\n"
             + '  "questions": [],\n'
             + '  "blockers": [],\n'
             + '  "handoff": null,\n'
             + '  "metadata": {}\n'
-            + "}\n"
+            + "}\n\n"
+            + "Artifact policy:\n"
+            + "- Keep artifacts empty unless the artifact content is very small.\n"
+            + "- Do NOT generate large document contents inside this response.\n"
+            + "- Use artifact_requests to declare documents or files that should "
+            + "be generated separately by the Factory.\n"
+            + "- Each artifact request must include a project-relative path and "
+            + "a concise purpose.\n"
+            + "- Keep the overall response concise.\n"
             + "Do not wrap the JSON in Markdown code fences."
         )
 
