@@ -2,6 +2,7 @@ import pytest
 
 from ai_factory.technology import (
     get_technology_config,
+    validate_proposal_constraints,
     validate_selection_mode,
     validate_technology_proposal,
 )
@@ -118,3 +119,129 @@ def test_validate_technology_proposal_rejects_missing_rationale() -> None:
         match="Rationale is required",
     ):
         validate_technology_proposal(proposal)
+
+
+def test_constrained_mode_accepts_allowed_technology() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "constrained",
+            "constraints": {
+                "backend": {
+                    "allowed": [
+                        "Example A",
+                        "Example B",
+                    ]
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example A",
+                "rationale": "Fits the project constraints.",
+            }
+        }
+    }
+
+    validate_proposal_constraints(
+        config,
+        proposal,
+    )
+
+
+def test_constrained_mode_rejects_disallowed_technology() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "constrained",
+            "constraints": {
+                "backend": {
+                    "allowed": [
+                        "Example A",
+                        "Example B",
+                    ]
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example C",
+                "rationale": "Technically valid but not allowed.",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="is not allowed",
+    ):
+        validate_proposal_constraints(
+            config,
+            proposal,
+        )
+
+
+def test_constrained_mode_requires_constrained_component() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "constrained",
+            "constraints": {
+                "database": {
+                    "allowed": [
+                        "Example Database",
+                    ]
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend",
+                "rationale": "Backend implementation.",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Required constrained component missing",
+    ):
+        validate_proposal_constraints(
+            config,
+            proposal,
+        )
+
+
+def test_non_constrained_mode_does_not_apply_constraints() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "recommend",
+            "constraints": {
+                "backend": {
+                    "allowed": [
+                        "Example A",
+                    ]
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example B",
+                "rationale": "Architect recommendation.",
+            }
+        }
+    }
+
+    validate_proposal_constraints(
+        config,
+        proposal,
+    )

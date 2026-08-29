@@ -76,3 +76,60 @@ def validate_technology_proposal(
             raise ValueError(
                 f"Rationale is required for component: {component_name}"
             )
+
+
+def validate_proposal_constraints(
+    config: dict[str, Any],
+    proposal: dict[str, Any],
+) -> None:
+    """Validate a technology proposal against project constraints."""
+
+    selection_mode = validate_selection_mode(config)
+
+    if selection_mode != "constrained":
+        return
+
+    technology_config = get_technology_config(config)
+    constraints = technology_config.get("constraints", {})
+
+    if not isinstance(constraints, dict):
+        raise ValueError(
+            "Technology constraints must be a mapping."
+        )
+
+    validate_technology_proposal(proposal)
+
+    components = proposal["components"]
+
+    for component_name, component_constraints in constraints.items():
+        if not isinstance(component_constraints, dict):
+            raise ValueError(
+                f"Invalid constraints for component: {component_name}"
+            )
+
+        allowed = component_constraints.get("allowed")
+
+        if allowed is None:
+            continue
+
+        if not isinstance(allowed, list):
+            raise ValueError(
+                f"Allowed technologies for {component_name} "
+                "must be a list."
+            )
+
+        if component_name not in components:
+            raise ValueError(
+                f"Required constrained component missing: "
+                f"{component_name}"
+            )
+
+        proposed_technology = components[
+            component_name
+        ]["technology"]
+
+        if proposed_technology not in allowed:
+            raise ValueError(
+                f"Technology '{proposed_technology}' is not allowed "
+                f"for component '{component_name}'."
+            )
