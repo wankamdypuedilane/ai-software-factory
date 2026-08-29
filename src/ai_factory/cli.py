@@ -7,6 +7,7 @@ from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.provider_factory import create_provider
 from ai_factory.result_renderer import render_agent_result
+from ai_factory.resume import resume_agent_with_input
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
 from ai_factory.technology_gate import (
@@ -128,6 +129,16 @@ def main() -> None:
         help="Execute the next ready agent",
     )
 
+    resume_parser = subparsers.add_parser(
+        "resume",
+        help="Resume a blocked agent after human input is provided",
+    )
+
+    resume_parser.add_argument(
+        "agent_name",
+        help="Blocked agent to resume",
+    )
+
     set_status_parser = subparsers.add_parser(
         "set-status",
         help="Update the status of an agent",
@@ -233,6 +244,34 @@ def main() -> None:
             )
 
         except ValueError as error:
+            parser.error(str(error))
+
+    elif args.command == "resume":
+        project_root = Path.cwd()
+        state_path = project_root / ".factory" / "state.yaml"
+        config_path = project_root / ".factory" / "project.yaml"
+
+        state = load_state(state_path)
+        config = load_state(config_path)
+
+        try:
+            state = resume_agent_with_input(
+                project_root=project_root,
+                state=state,
+                project_config=config,
+                agent_name=args.agent_name,
+            )
+
+            save_state(
+                state_path,
+                state,
+            )
+
+            print(
+                f"Agent '{args.agent_name}' resumed and set to READY."
+            )
+
+        except (ValueError, KeyError) as error:
             parser.error(str(error))
 
     elif args.command == "set-status":
