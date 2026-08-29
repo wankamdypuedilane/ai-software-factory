@@ -1,7 +1,7 @@
 import pytest
 
 from ai_factory.state import save_state
-from ai_factory.transitions import resume_agent, set_agent_status
+from ai_factory.transitions import retry_agent, resume_agent, set_agent_status
 
 
 def test_set_agent_status_updates_status() -> None:
@@ -353,4 +353,57 @@ def test_resume_agent_rejects_unknown_agent() -> None:
         resume_agent(
             state,
             "unknown",
+        )
+
+
+def test_retry_agent_moves_review_required_to_ready() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "REVIEW_REQUIRED",
+            }
+        }
+    }
+
+    result = retry_agent(
+        state,
+        "product",
+    )
+
+    assert result["agents"]["product"]["status"] == "READY"
+
+
+def test_retry_agent_moves_failed_to_ready() -> None:
+    state = {
+        "agents": {
+            "architect": {
+                "status": "FAILED",
+            }
+        }
+    }
+
+    result = retry_agent(
+        state,
+        "architect",
+    )
+
+    assert result["agents"]["architect"]["status"] == "READY"
+
+
+def test_retry_agent_rejects_invalid_status() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="cannot be retried",
+    ):
+        retry_agent(
+            state,
+            "product",
         )

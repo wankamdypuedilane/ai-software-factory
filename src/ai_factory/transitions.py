@@ -116,3 +116,33 @@ def resume_agent(
     agents[agent_name]["status"] = "READY"
 
     return state
+
+
+def retry_agent(
+    state: dict[str, Any],
+    agent_name: str,
+) -> dict[str, Any]:
+    """Retry an agent that is blocked or waiting for review."""
+
+    agents = state.get("agents", {})
+
+    if agent_name not in agents:
+        raise KeyError(
+            f"Unknown agent: {agent_name}"
+        )
+
+    current_status = agents[agent_name]["status"]
+
+    if current_status not in {
+        "BLOCKED",
+        "REVIEW_REQUIRED",
+        "FAILED",
+    }:
+        raise ValueError(
+            f"Agent '{agent_name}' cannot be retried "
+            f"from status {current_status}."
+        )
+
+    agents[agent_name]["status"] = "READY"
+
+    return state
