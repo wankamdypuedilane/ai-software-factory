@@ -41,3 +41,11 @@ context:
     security: []
     devops: []
     sre: []
+
+ai:
+  provider: mock
+  model: null
+
+  settings:
+    temperature: null
+    max_output_tokens: null

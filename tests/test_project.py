@@ -100,3 +100,7 @@ def test_initialize_project_creates_project_configuration(tmp_path):
     assert config["technology"]["selected"]["infrastructure"] == {}
     assert config["technology"]["selected"]["ci_cd"] == {}
     assert config["technology"]["selected"]["observability"] == {}
+    assert config["ai"]["provider"] == "mock"
+    assert config["ai"]["model"] is None
+    assert config["ai"]["settings"]["temperature"] is None
+    assert config["ai"]["settings"]["max_output_tokens"] is None
