@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.agent_runner import run_agent
-from ai_factory.providers import ModelProvider
+from ai_factory.providers import MockProvider, ModelProvider
 from ai_factory.state import save_state
 
 
@@ -77,3 +77,15 @@ def test_run_agent_builds_context_and_calls_provider(
         provider.received_context["contract"],
         str,
     )
+
+
+def test_mock_provider_returns_deterministic_output() -> None:
+    provider = MockProvider()
+
+    result = provider.run(
+        {
+            "agent_name": "architect",
+        }
+    )
+
+    assert result == "Mock execution completed for agent: architect"

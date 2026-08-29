@@ -12,3 +12,18 @@ class ModelProvider(ABC):
     ) -> str:
         """Execute an agent using the supplied context."""
         raise NotImplementedError
+
+
+class MockProvider(ModelProvider):
+    """Deterministic provider used for local execution and tests."""
+
+    def run(
+        self,
+        context: dict[str, Any],
+    ) -> str:
+        agent_name = context["agent_name"]
+
+        return (
+            f"Mock execution completed for agent: "
+            f"{agent_name}"
+        )
