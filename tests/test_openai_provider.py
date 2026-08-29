@@ -146,6 +146,8 @@ def test_openai_provider_execute_uses_responses_api(
     captured = {}
 
     class FakeResponse:
+        status = "completed"
+        incomplete_details = None
         output_text = "generated-agent-output"
 
     class FakeResponses:
@@ -296,3 +298,79 @@ def test_openai_provider_rejects_artifact_without_path(
         match="artifact path is required",
     ):
         provider._parse_result(raw_output)
+
+
+def test_openai_provider_rejects_incomplete_response(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeIncompleteDetails:
+        reason = "max_output_tokens"
+
+        def __repr__(self) -> str:
+            return "FakeIncompleteDetails(reason='max_output_tokens')"
+
+    class FakeResponse:
+        status = "incomplete"
+        incomplete_details = FakeIncompleteDetails()
+        output_text = ""
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="OpenAI response was incomplete",
+    ):
+        provider._execute(
+            "prepared prompt"
+        )
+
+
+def test_openai_provider_rejects_empty_output(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = ""
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="returned no text output",
+    ):
+        provider._execute(
+            "prepared prompt"
+        )

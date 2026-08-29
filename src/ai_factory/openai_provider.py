@@ -268,4 +268,21 @@ class OpenAIProvider(ModelProvider):
             **request_kwargs,
         )
 
+        if response.status == "incomplete":
+            incomplete_details = getattr(
+                response,
+                "incomplete_details",
+                None,
+            )
+
+            raise ValueError(
+                "OpenAI response was incomplete. "
+                f"Details: {incomplete_details}"
+            )
+
+        if not response.output_text:
+            raise ValueError(
+                "OpenAI returned no text output."
+            )
+
         return response.output_text
