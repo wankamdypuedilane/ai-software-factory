@@ -5,6 +5,8 @@ from ai_factory.approvals import approve
 from ai_factory.design_gate import get_design_gate
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
+from ai_factory.providers import MockProvider
+from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
 from ai_factory.technology_gate import (
     approve_technology_gate,
@@ -120,6 +122,11 @@ def main() -> None:
         help="Display the next agent that should work",
     )
 
+    subparsers.add_parser(
+        "run",
+        help="Execute the next ready agent",
+    )
+
     set_status_parser = subparsers.add_parser(
         "set-status",
         help="Update the status of an agent",
@@ -203,6 +210,22 @@ def main() -> None:
             print(next_agent)
         else:
             print("none")
+
+    elif args.command == "run":
+        provider = MockProvider()
+
+        try:
+            agent_name, output = run_next_agent(
+                project_root=Path.cwd(),
+                provider=provider,
+            )
+
+            print(f"Running agent: {agent_name}")
+            print()
+            print(output)
+
+        except ValueError as error:
+            parser.error(str(error))
 
     elif args.command == "set-status":
         state_path = Path.cwd() / ".factory" / "state.yaml"
