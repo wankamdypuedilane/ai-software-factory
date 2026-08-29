@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from ai_factory.agent_runner import run_agent
+from ai_factory.artifact_runtime import run_artifact_generation
+from ai_factory.context_builder import build_agent_context
 from ai_factory.orchestrator import (
     get_execution_blocker,
     get_next_agent,
@@ -40,11 +42,34 @@ def run_next_agent(
         provider=provider,
     )
 
+    context = build_agent_context(
+        project_root=project_root,
+        agent_name=agent_name,
+    )
+
+    generated_artifacts = run_artifact_generation(
+        project_root=project_root,
+        agent_name=agent_name,
+        result=result,
+        context=context,
+        provider=provider,
+    )
+
+    generated_paths = [
+        artifact.path
+        for artifact in generated_artifacts
+    ]
+
     state = apply_agent_result(
         state,
         agent_name,
         result,
     )
+
+    if generated_paths:
+        state["agents"][agent_name]["last_result"][
+            "generated_artifacts"
+        ] = generated_paths
 
     save_state(
         state_path,

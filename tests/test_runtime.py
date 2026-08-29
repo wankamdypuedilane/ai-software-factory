@@ -2,9 +2,37 @@ from pathlib import Path
 
 import pytest
 
-from ai_factory.providers import MockProvider
+from ai_factory.agent_result import (
+    AgentArtifactRequest,
+    AgentResult,
+)
+from ai_factory.providers import MockProvider, ModelProvider
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
+
+
+class RuntimeTestProvider(ModelProvider):
+    def run(
+        self,
+        context,
+    ) -> AgentResult:
+        return AgentResult(
+            status="COMPLETED",
+            summary="Architecture completed.",
+            artifact_requests=[
+                AgentArtifactRequest(
+                    path="knowledge/architecture/system.md",
+                    purpose="Document the system architecture.",
+                )
+            ],
+            handoff="developer",
+        )
+
+    def generate(
+        self,
+        prompt: str,
+    ) -> str:
+        return "# System Architecture\n\nGenerated architecture."
 
 
 def test_run_next_agent_executes_selected_agent(
@@ -63,7 +91,7 @@ def test_run_next_agent_executes_selected_agent(
         },
     )
 
-    provider = MockProvider()
+    provider = RuntimeTestProvider()
 
     agent_name, output = run_next_agent(
         project_root=tmp_path,
@@ -73,14 +101,7 @@ def test_run_next_agent_executes_selected_agent(
     assert agent_name == "architect"
 
     assert output.status == "COMPLETED"
-    assert (
-        output.summary
-        == "Mock execution completed for agent: architect"
-    )
-    assert output.artifacts == []
-    assert output.questions == []
-    assert output.blockers == []
-    assert output.handoff is None
+    assert output.summary == "Architecture completed."
 
     updated_state = load_state(
         factory_dir / "state.yaml"
@@ -92,7 +113,23 @@ def test_run_next_agent_executes_selected_agent(
     assert architect["last_result"]["status"] == "COMPLETED"
     assert (
         architect["last_result"]["summary"]
-        == "Mock execution completed for agent: architect"
+        == "Architecture completed."
+    )
+    assert architect["last_result"]["generated_artifacts"] == [
+        "knowledge/architecture/system.md"
+    ]
+
+    generated_file = (
+        tmp_path
+        / "knowledge"
+        / "architecture"
+        / "system.md"
+    )
+
+    assert generated_file.exists()
+    assert (
+        generated_file.read_text(encoding="utf-8")
+        == "# System Architecture\n\nGenerated architecture."
     )
 
 
