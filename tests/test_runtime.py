@@ -214,8 +214,11 @@ def test_cli_run_executes_next_agent(
 
     output = capsys.readouterr().out
 
-    assert "Running agent: architect" in output
+    assert "Agent: architect" in output
+    assert "Status: COMPLETED" in output
+    assert "Summary:" in output
     assert (
         "Mock execution completed for agent: architect"
         in output
     )
+    assert "Handoff: none" in output

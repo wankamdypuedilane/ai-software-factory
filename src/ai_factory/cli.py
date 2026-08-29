@@ -6,6 +6,7 @@ from ai_factory.design_gate import get_design_gate
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.provider_factory import create_provider
+from ai_factory.result_renderer import render_agent_result
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
 from ai_factory.technology_gate import (
@@ -224,9 +225,12 @@ def main() -> None:
                 provider=provider,
             )
 
-            print(f"Running agent: {agent_name}")
-            print()
-            print(output)
+            print(
+                render_agent_result(
+                    agent_name,
+                    output,
+                )
+            )
 
         except ValueError as error:
             parser.error(str(error))
