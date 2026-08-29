@@ -15,7 +15,7 @@ from ai_factory.technology_gate import (
     is_technology_gate_approved,
     submit_technology_proposal,
 )
-from ai_factory.transitions import set_agent_status
+from ai_factory.transitions import retry_agent, set_agent_status
 
 
 def show_status(project_root: Path) -> None:
@@ -137,6 +137,16 @@ def main() -> None:
     resume_parser.add_argument(
         "agent_name",
         help="Blocked agent to resume",
+    )
+
+    retry_parser = subparsers.add_parser(
+        "retry",
+        help="Retry a blocked, failed, or review-required agent",
+    )
+
+    retry_parser.add_argument(
+        "agent_name",
+        help="Agent to retry",
     )
 
     set_status_parser = subparsers.add_parser(
@@ -269,6 +279,30 @@ def main() -> None:
 
             print(
                 f"Agent '{args.agent_name}' resumed and set to READY."
+            )
+
+        except (ValueError, KeyError) as error:
+            parser.error(str(error))
+
+    elif args.command == "retry":
+        project_root = Path.cwd()
+        state_path = project_root / ".factory" / "state.yaml"
+
+        state = load_state(state_path)
+
+        try:
+            state = retry_agent(
+                state,
+                args.agent_name,
+            )
+
+            save_state(
+                state_path,
+                state,
+            )
+
+            print(
+                f"Agent '{args.agent_name}' reset to READY for retry."
             )
 
         except (ValueError, KeyError) as error:
