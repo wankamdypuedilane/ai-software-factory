@@ -62,3 +62,88 @@ def test_set_agent_status_rejects_forbidden_transition() -> None:
             "product",
             "COMPLETED",
         )
+
+
+def test_ux_ui_cannot_request_review_with_missing_artifacts(tmp_path):
+    state = {
+        "agents": {
+            "ux_ui": {
+                "status": "IN_PROGRESS",
+            }
+        }
+    }
+
+    with pytest.raises(ValueError, match="UX/UI artifacts are incomplete"):
+        set_agent_status(
+            state,
+            "ux_ui",
+            "REVIEW_REQUIRED",
+            project_root=tmp_path,
+        )
+
+
+def test_ux_ui_can_request_review_when_artifacts_exist(tmp_path):
+    required_files = [
+        "knowledge/ux-ui/user-flows.md",
+        "knowledge/ux-ui/screen-inventory.md",
+        "knowledge/ux-ui/visual-direction.md",
+        "knowledge/ux-ui/design-system.md",
+        "knowledge/ux-ui/high-fidelity-brief.md",
+        "knowledge/ux-ui/wireframes/passenger-booking.md",
+        "knowledge/ux-ui/wireframes/driver-ride.md",
+        "knowledge/ux-ui/wireframes/supporting-screens.md",
+        "knowledge/ux-ui/high-fidelity/passenger-screens.md",
+        "knowledge/ux-ui/high-fidelity/driver-screens.md",
+        "knowledge/ux-ui/high-fidelity/component-specs.md",
+    ]
+
+    for relative_path in required_files:
+        file_path = tmp_path / relative_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.touch()
+
+    state = {
+        "agents": {
+            "ux_ui": {
+                "status": "IN_PROGRESS",
+            }
+        }
+    }
+
+    result = set_agent_status(
+        state,
+        "ux_ui",
+        "REVIEW_REQUIRED",
+        project_root=tmp_path,
+    )
+
+    assert result["agents"]["ux_ui"]["status"] == "REVIEW_REQUIRED"
+
+
+def test_ux_ui_cannot_be_approved_when_design_gate_is_not_ready() -> None:
+    state = {
+        "agents": {
+            "ux_ui": {
+                "status": "REVIEW_REQUIRED",
+            }
+        },
+        "design_gate": {
+            "status": "PARTIAL",
+            "passenger_screens_approved": 5,
+            "passenger_screens_total": 7,
+            "driver_screens_approved": 0,
+            "driver_screens_total": 7,
+            "figma_blocked": True,
+            "human_approval": False,
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Design Gate is not ready",
+    ):
+        set_agent_status(
+            state,
+            "ux_ui",
+            "APPROVED",
+        )

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+from ai_factory.design_gate import is_design_gate_ready
 from ai_factory.validators import validate_ux_ui_artifacts
 from ai_factory.workflow import is_transition_allowed
 
@@ -57,6 +58,13 @@ def set_agent_status(
             raise ValueError(
                 "UX/UI artifacts are incomplete.\n"
                 f"Missing artifacts:\n{missing_list}"
+            )
+
+    if agent_name == "ux_ui" and status == "APPROVED":
+        if not is_design_gate_ready(state):
+            raise ValueError(
+                "UX/UI cannot be approved: "
+                "the Design Gate is not ready for human approval."
             )
 
     agents[agent_name]["status"] = status
