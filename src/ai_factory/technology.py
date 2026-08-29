@@ -39,3 +39,40 @@ def validate_selection_mode(
         )
 
     return selection_mode
+
+
+def validate_technology_proposal(
+    proposal: dict[str, Any],
+) -> None:
+    """Validate the structure of an Architect technology proposal."""
+
+    if not isinstance(proposal, dict):
+        raise ValueError(
+            "Technology proposal must be a mapping."
+        )
+
+    components = proposal.get("components")
+
+    if not isinstance(components, dict) or not components:
+        raise ValueError(
+            "Technology proposal must contain components."
+        )
+
+    for component_name, component in components.items():
+        if not isinstance(component, dict):
+            raise ValueError(
+                f"Invalid technology component: {component_name}"
+            )
+
+        technology = component.get("technology")
+        rationale = component.get("rationale")
+
+        if not isinstance(technology, str) or not technology.strip():
+            raise ValueError(
+                f"Technology is required for component: {component_name}"
+            )
+
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise ValueError(
+                f"Rationale is required for component: {component_name}"
+            )
