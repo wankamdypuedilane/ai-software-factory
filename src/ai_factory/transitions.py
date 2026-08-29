@@ -2,6 +2,11 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.design_gate import is_design_gate_ready
+from ai_factory.state import load_state
+from ai_factory.technology_gate import (
+    is_technology_gate_approved,
+    is_technology_gate_required,
+)
 from ai_factory.validators import validate_ux_ui_artifacts
 from ai_factory.workflow import is_transition_allowed
 
@@ -66,6 +71,22 @@ def set_agent_status(
                 "UX/UI cannot be approved: "
                 "the Design Gate is not ready for human approval."
             )
+
+    if agent_name == "architect" and status == "APPROVED":
+        if project_root is None:
+            raise ValueError(
+                "Project root is required to validate the Technology Gate."
+            )
+
+        config_path = project_root / ".factory" / "project.yaml"
+        config = load_state(config_path)
+
+        if is_technology_gate_required(config):
+            if not is_technology_gate_approved(state):
+                raise ValueError(
+                    "Architecture cannot be approved: "
+                    "the Technology Gate is not approved."
+                )
 
     agents[agent_name]["status"] = status
 

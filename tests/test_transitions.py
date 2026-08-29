@@ -195,3 +195,111 @@ def test_ux_ui_cannot_be_approved_when_design_gate_is_not_ready() -> None:
             "ux_ui",
             "APPROVED",
         )
+
+
+def test_architect_approval_requires_technology_gate_when_recommended(
+    tmp_path,
+) -> None:
+    config_path = tmp_path / ".factory" / "project.yaml"
+
+    save_state(
+        config_path,
+        {
+            "technology": {
+                "selection_mode": "recommend",
+            }
+        },
+    )
+
+    state = {
+        "agents": {
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+            }
+        },
+        "technology_gate": {
+            "status": "REVIEW_REQUIRED",
+            "human_approval": False,
+            "proposal": {},
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Technology Gate is not approved",
+    ):
+        set_agent_status(
+            state,
+            "architect",
+            "APPROVED",
+            project_root=tmp_path,
+        )
+
+
+def test_architect_approval_succeeds_when_technology_gate_is_approved(
+    tmp_path,
+) -> None:
+    config_path = tmp_path / ".factory" / "project.yaml"
+
+    save_state(
+        config_path,
+        {
+            "technology": {
+                "selection_mode": "recommend",
+            }
+        },
+    )
+
+    state = {
+        "agents": {
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+            }
+        },
+        "technology_gate": {
+            "status": "APPROVED",
+            "human_approval": True,
+            "proposal": {},
+        },
+    }
+
+    result = set_agent_status(
+        state,
+        "architect",
+        "APPROVED",
+        project_root=tmp_path,
+    )
+
+    assert result["agents"]["architect"]["status"] == "APPROVED"
+
+
+def test_architect_approval_does_not_require_gate_in_manual_mode(
+    tmp_path,
+) -> None:
+    config_path = tmp_path / ".factory" / "project.yaml"
+
+    save_state(
+        config_path,
+        {
+            "technology": {
+                "selection_mode": "manual",
+            }
+        },
+    )
+
+    state = {
+        "agents": {
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+            }
+        },
+    }
+
+    result = set_agent_status(
+        state,
+        "architect",
+        "APPROVED",
+        project_root=tmp_path,
+    )
+
+    assert result["agents"]["architect"]["status"] == "APPROVED"
