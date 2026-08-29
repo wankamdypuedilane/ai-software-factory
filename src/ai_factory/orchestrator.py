@@ -102,3 +102,35 @@ def get_execution_blocker(
             )
 
     return None
+
+
+def activate_next_agent(
+    state: dict[str, Any],
+    completed_agent: str,
+) -> dict[str, Any]:
+    """Activate the agent that follows an approved agent."""
+
+    try:
+        current_index = AGENT_ORDER.index(completed_agent)
+    except ValueError as error:
+        raise ValueError(
+            f"Unknown agent in execution order: {completed_agent}"
+        ) from error
+
+    next_index = current_index + 1
+
+    if next_index >= len(AGENT_ORDER):
+        return state
+
+    next_agent = AGENT_ORDER[next_index]
+    agents = state.get("agents", {})
+
+    if next_agent not in agents:
+        raise KeyError(
+            f"Unknown next agent: {next_agent}"
+        )
+
+    if agents[next_agent]["status"] == "NOT_STARTED":
+        agents[next_agent]["status"] = "READY"
+
+    return state
