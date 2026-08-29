@@ -195,3 +195,26 @@ def validate_manual_selection(
                 f"'{selected_technology}' for component "
                 f"'{component_name}'."
             )
+
+
+def validate_technology_decision(
+    config: dict[str, Any],
+    proposal: dict[str, Any],
+) -> None:
+    """Validate a complete technology decision for the project."""
+
+    selection_mode = validate_selection_mode(config)
+
+    validate_technology_proposal(proposal)
+
+    if selection_mode == "constrained":
+        validate_proposal_constraints(
+            config,
+            proposal,
+        )
+
+    elif selection_mode == "manual":
+        validate_manual_selection(
+            config,
+            proposal,
+        )

@@ -5,6 +5,7 @@ from ai_factory.technology import (
     validate_manual_selection,
     validate_proposal_constraints,
     validate_selection_mode,
+    validate_technology_decision,
     validate_technology_proposal,
 )
 
@@ -376,3 +377,89 @@ def test_non_manual_mode_does_not_enforce_manual_selection() -> None:
     }
 
     validate_manual_selection(config, proposal)
+
+
+def test_validate_technology_decision_accepts_recommend_mode() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "recommend",
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend",
+                "rationale": "Architect recommendation.",
+            }
+        }
+    }
+
+    validate_technology_decision(
+        config,
+        proposal,
+    )
+
+
+def test_validate_technology_decision_enforces_constrained_mode() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "constrained",
+            "constraints": {
+                "backend": {
+                    "allowed": [
+                        "Example A",
+                    ]
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example B",
+                "rationale": "Alternative proposal.",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="is not allowed",
+    ):
+        validate_technology_decision(
+            config,
+            proposal,
+        )
+
+
+def test_validate_technology_decision_enforces_manual_mode() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "manual",
+            "selected": {
+                "backend": {
+                    "technology": "Example A",
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example B",
+                "rationale": "Alternative proposal.",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="cannot replace manually selected technology",
+    ):
+        validate_technology_decision(
+            config,
+            proposal,
+        )
