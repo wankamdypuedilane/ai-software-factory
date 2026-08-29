@@ -60,5 +60,11 @@ def test_initial_state_is_valid_yaml(tmp_path: Path) -> None:
     assert state["factory_version"] == "1.0"
     assert state["project"]["phase"] == "discovery"
     assert state["agents"]["product"]["status"] == "READY"
+    assert "design_gate" in state
+    assert "design_gate" not in state["approvals"]
+    assert state["design_gate"]["status"] == "NOT_STARTED"
+    assert state["design_gate"]["passenger_screens_approved"] == 0
+    assert state["design_gate"]["driver_screens_approved"] == 0
+    assert state["design_gate"]["figma_blocked"] is False
 
     
