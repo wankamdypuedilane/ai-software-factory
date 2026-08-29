@@ -8,6 +8,7 @@ from openai import OpenAI
 
 from ai_factory.agent_result import (
     AgentArtifact,
+    AgentArtifactRequest,
     AgentResult,
 )
 from ai_factory.prompt_builder import build_agent_prompt
@@ -146,6 +147,44 @@ class OpenAIProvider(ModelProvider):
                 )
             )
 
+        artifact_requests_data = data.get(
+            "artifact_requests",
+            [],
+        )
+
+        if not isinstance(artifact_requests_data, list):
+            raise ValueError(
+                "Agent result artifact requests must be a list."
+            )
+
+        artifact_requests = []
+
+        for request_data in artifact_requests_data:
+            if not isinstance(request_data, dict):
+                raise ValueError(
+                    "Invalid agent artifact request."
+                )
+
+            path = request_data.get("path")
+            purpose = request_data.get("purpose")
+
+            if not isinstance(path, str) or not path.strip():
+                raise ValueError(
+                    "Agent artifact request path is required."
+                )
+
+            if not isinstance(purpose, str) or not purpose.strip():
+                raise ValueError(
+                    "Agent artifact request purpose is required."
+                )
+
+            artifact_requests.append(
+                AgentArtifactRequest(
+                    path=path,
+                    purpose=purpose,
+                )
+            )
+
         status = data.get("status")
         summary = data.get("summary")
 
@@ -163,6 +202,7 @@ class OpenAIProvider(ModelProvider):
             status=status,
             summary=summary,
             artifacts=artifacts,
+            artifact_requests=artifact_requests,
             questions=data.get("questions", []),
             blockers=data.get("blockers", []),
             handoff=data.get("handoff"),
@@ -219,6 +259,25 @@ class OpenAIProvider(ModelProvider):
                                 "additionalProperties": False,
                             },
                         },
+                        "artifact_requests": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                    },
+                                    "purpose": {
+                                        "type": "string",
+                                    },
+                                },
+                                "required": [
+                                    "path",
+                                    "purpose",
+                                ],
+                                "additionalProperties": False,
+                            },
+                        },
                         "questions": {
                             "type": "array",
                             "items": {
@@ -247,6 +306,7 @@ class OpenAIProvider(ModelProvider):
                         "status",
                         "summary",
                         "artifacts",
+                        "artifact_requests",
                         "questions",
                         "blockers",
                         "handoff",

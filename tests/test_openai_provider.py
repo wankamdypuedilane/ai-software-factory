@@ -181,15 +181,18 @@ def test_openai_provider_execute_uses_responses_api(
     assert "status" in schema["properties"]
     assert "summary" in schema["properties"]
     assert "artifacts" in schema["properties"]
+    assert "artifact_requests" in schema["properties"]
     assert "questions" in schema["properties"]
     assert "blockers" in schema["properties"]
     assert "handoff" in schema["properties"]
     assert "metadata" in schema["properties"]
+    assert "artifact_requests" in schema["required"]
 
     assert set(schema["required"]) == {
         "status",
         "summary",
         "artifacts",
+        "artifact_requests",
         "questions",
         "blockers",
         "handoff",
@@ -213,10 +216,11 @@ def test_openai_provider_parses_structured_agent_result(
 {
   "status": "COMPLETED",
   "summary": "Architecture proposal completed.",
-  "artifacts": [
+  "artifacts": [],
+  "artifact_requests": [
     {
       "path": "knowledge/architecture/system.md",
-      "content": "# Architecture"
+      "purpose": "Document the approved system architecture."
     }
   ],
   "questions": [],
@@ -232,12 +236,16 @@ def test_openai_provider_parses_structured_agent_result(
 
     assert result.status == "COMPLETED"
     assert result.summary == "Architecture proposal completed."
-    assert len(result.artifacts) == 1
+    assert result.artifacts == []
+    assert len(result.artifact_requests) == 1
     assert (
-        result.artifacts[0].path
+        result.artifact_requests[0].path
         == "knowledge/architecture/system.md"
     )
-    assert result.artifacts[0].content == "# Architecture"
+    assert (
+        result.artifact_requests[0].purpose
+        == "Document the approved system architecture."
+    )
     assert result.questions == []
     assert result.blockers == []
     assert result.handoff == "developer"
@@ -374,3 +382,39 @@ def test_openai_provider_rejects_empty_output(
         provider._execute(
             "prepared prompt"
         )
+
+
+def test_openai_provider_rejects_artifact_request_without_purpose(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+{
+  "status": "COMPLETED",
+  "summary": "Done.",
+  "artifacts": [],
+  "artifact_requests": [
+    {
+      "path": "knowledge/product/requirements.md"
+    }
+  ],
+  "questions": [],
+  "blockers": [],
+  "handoff": null,
+  "metadata": {}
+}
+"""
+
+    with pytest.raises(
+        ValueError,
+        match="artifact request purpose is required",
+    ):
+        provider._parse_result(raw_output)
