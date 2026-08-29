@@ -5,7 +5,8 @@ description = "Reusable AI-assisted software development factory"
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6.0",
-    "openai>=1.0"
+    "openai>=1.0",
+    "python-dotenv>=1.0"
 ]
 
 [project.scripts]

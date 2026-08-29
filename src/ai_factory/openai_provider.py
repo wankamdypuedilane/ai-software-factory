@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from openai import OpenAI
 
 from ai_factory.prompt_builder import build_agent_prompt
@@ -22,6 +24,16 @@ class OpenAIProvider(ModelProvider):
 
         self.model = model
         self.settings = settings or {}
+
+        env_path = (
+            Path(__file__).resolve().parents[2]
+            / ".env"
+        )
+
+        load_dotenv(
+            dotenv_path=env_path,
+            override=False,
+        )
 
         api_key = os.getenv("OPENAI_API_KEY")
 

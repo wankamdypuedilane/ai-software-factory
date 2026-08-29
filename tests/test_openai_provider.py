@@ -28,6 +28,11 @@ def test_openai_provider_requires_api_key(
         raising=False,
     )
 
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.load_dotenv",
+        lambda *args, **kwargs: False,
+    )
+
     with pytest.raises(
         ValueError,
         match="OPENAI_API_KEY",
