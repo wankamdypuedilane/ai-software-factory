@@ -428,3 +428,122 @@ def test_openai_provider_rejects_artifact_request_without_purpose(
         match="artifact request purpose is required",
     ):
         provider._parse_result(raw_output)
+
+
+def test_openai_provider_generate_returns_artifact_content(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "max_output_tokens": 1500,
+        },
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = "  # Generated Artifact\n\nContent.  "
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    result = provider.generate(
+        "artifact prompt"
+    )
+
+    assert result == "# Generated Artifact\n\nContent."
+    assert captured["model"] == "test-model"
+    assert captured["input"] == "artifact prompt"
+    assert captured["max_output_tokens"] == 1500
+    assert "text" not in captured
+
+
+def test_openai_provider_generate_rejects_incomplete_response(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeIncompleteDetails:
+        reason = "max_output_tokens"
+
+        def __repr__(self) -> str:
+            return "FakeIncompleteDetails(reason='max_output_tokens')"
+
+    class FakeResponse:
+        status = "incomplete"
+        incomplete_details = FakeIncompleteDetails()
+        output_text = ""
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="artifact response was incomplete",
+    ):
+        provider.generate(
+            "artifact prompt"
+        )
+
+
+def test_openai_provider_generate_rejects_empty_content(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = ""
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="no artifact content",
+    ):
+        provider.generate(
+            "artifact prompt"
+        )

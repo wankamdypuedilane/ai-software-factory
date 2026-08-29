@@ -53,6 +53,47 @@ class OpenAIProvider(ModelProvider):
             api_key=self.api_key,
         )
 
+    def generate(
+        self,
+        prompt: str,
+    ) -> str:
+        """Generate raw text content for a single artifact."""
+
+        request_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "input": prompt,
+        }
+
+        max_output_tokens = self.settings.get(
+            "max_output_tokens",
+        )
+
+        if max_output_tokens is not None:
+            request_kwargs["max_output_tokens"] = max_output_tokens
+
+        response = self.client.responses.create(
+            **request_kwargs,
+        )
+
+        if response.status == "incomplete":
+            incomplete_details = getattr(
+                response,
+                "incomplete_details",
+                None,
+            )
+
+            raise ValueError(
+                "OpenAI artifact response was incomplete. "
+                f"Details: {incomplete_details}"
+            )
+
+        if not response.output_text:
+            raise ValueError(
+                "OpenAI returned no artifact content."
+            )
+
+        return response.output_text.strip()
+
     def run(
         self,
         context: dict[str, Any],
