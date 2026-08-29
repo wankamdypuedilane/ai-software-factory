@@ -26,3 +26,10 @@ def test_load_agent_contract_rejects_unknown_agent() -> None:
         match="Agent contract not found",
     ):
         load_agent_contract("unknown-agent")
+
+
+def test_load_agent_contract_supports_underscore_agent_name() -> None:
+    contract = load_agent_contract("ux_ui")
+
+    assert isinstance(contract, str)
+    assert contract.strip() != ""

@@ -13,9 +13,14 @@ def get_agents_root() -> Path:
 def get_agent_contract_path(agent_name: str) -> Path:
     """Return the AGENT.md path for a given agent."""
 
+    directory_name = agent_name.replace(
+        "_",
+        "-",
+    )
+
     contract_path = (
         get_agents_root()
-        / agent_name
+        / directory_name
         / "AGENT.md"
     )
 
