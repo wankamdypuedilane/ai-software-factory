@@ -6,7 +6,8 @@ from ai_factory.orchestrator import (
     get_next_agent,
 )
 from ai_factory.providers import ModelProvider
-from ai_factory.state import load_state
+from ai_factory.result_application import apply_agent_result
+from ai_factory.state import load_state, save_state
 
 
 def run_next_agent(
@@ -33,10 +34,21 @@ def run_next_agent(
             "No agent is currently ready for execution."
         )
 
-    output = run_agent(
+    result = run_agent(
         project_root=project_root,
         agent_name=agent_name,
         provider=provider,
     )
 
-    return agent_name, output
+    state = apply_agent_result(
+        state,
+        agent_name,
+        result,
+    )
+
+    save_state(
+        state_path,
+        state,
+    )
+
+    return agent_name, result

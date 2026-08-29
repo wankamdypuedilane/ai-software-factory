@@ -4,7 +4,7 @@ import pytest
 
 from ai_factory.providers import MockProvider
 from ai_factory.runtime import run_next_agent
-from ai_factory.state import save_state
+from ai_factory.state import load_state, save_state
 
 
 def test_run_next_agent_executes_selected_agent(
@@ -81,6 +81,19 @@ def test_run_next_agent_executes_selected_agent(
     assert output.questions == []
     assert output.blockers == []
     assert output.handoff is None
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    architect = updated_state["agents"]["architect"]
+
+    assert architect["status"] == "REVIEW_REQUIRED"
+    assert architect["last_result"]["status"] == "COMPLETED"
+    assert (
+        architect["last_result"]["summary"]
+        == "Mock execution completed for agent: architect"
+    )
 
 
 def test_run_next_agent_rejects_when_no_agent_is_ready(
