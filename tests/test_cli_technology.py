@@ -129,3 +129,68 @@ def test_technology_submit_updates_gate(
         ["components"]["backend"]["technology"]
         == "Example Backend"
     )
+
+
+def test_technology_approve_updates_gate(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "technology": {
+                "selection_mode": "recommend",
+            }
+        },
+    )
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "technology_gate": {
+                "status": "REVIEW_REQUIRED",
+                "human_approval": False,
+                "proposal": {
+                    "components": {
+                        "backend": {
+                            "technology": "Example Backend",
+                            "rationale": "Fits the project requirements.",
+                        }
+                    }
+                },
+            }
+        },
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "ai-factory",
+            "technology",
+            "approve",
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+
+    assert "Technology proposal approved." in output
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["technology_gate"]["status"]
+        == "APPROVED"
+    )
+
+    assert (
+        updated_state["technology_gate"]["human_approval"]
+        is True
+    )

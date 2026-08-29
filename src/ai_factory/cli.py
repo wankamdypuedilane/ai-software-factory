@@ -7,6 +7,7 @@ from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.state import load_state, save_state
 from ai_factory.technology_gate import (
+    approve_technology_gate,
     is_technology_gate_approved,
     submit_technology_proposal,
 )
@@ -169,6 +170,11 @@ def main() -> None:
         help="Path to a YAML technology proposal",
     )
 
+    technology_subparsers.add_parser(
+        "approve",
+        help="Approve the technology proposal after human review",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -304,6 +310,17 @@ def main() -> None:
                 print("Technology proposal submitted for human review.")
 
             except (ValueError, FileNotFoundError) as error:
+                parser.error(str(error))
+
+        elif args.technology_command == "approve":
+            try:
+                state = approve_technology_gate(state)
+
+                save_state(state_path, state)
+
+                print("Technology proposal approved.")
+
+            except ValueError as error:
                 parser.error(str(error))
 
 
