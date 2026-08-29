@@ -1,6 +1,7 @@
 from ai_factory.technology_gate import (
     is_technology_gate_approved,
     is_technology_gate_required,
+    submit_technology_proposal,
     validate_technology_gate,
 )
 
@@ -87,3 +88,70 @@ def test_technology_gate_not_required_for_manual_mode() -> None:
 
 def test_technology_gate_not_required_without_technology_config() -> None:
     assert is_technology_gate_required({}) is False
+
+
+def test_submit_technology_proposal_updates_gate() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "recommend",
+        }
+    }
+
+    state = {
+        "technology_gate": {
+            "status": "NOT_STARTED",
+            "human_approval": False,
+            "proposal": {},
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend",
+                "rationale": "Fits the application requirements.",
+            }
+        }
+    }
+
+    result = submit_technology_proposal(
+        state,
+        config,
+        proposal,
+    )
+
+    assert result["technology_gate"]["status"] == "REVIEW_REQUIRED"
+    assert result["technology_gate"]["human_approval"] is False
+    assert result["technology_gate"]["proposal"] == proposal
+
+
+def test_submit_technology_proposal_rejects_invalid_proposal() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "recommend",
+        }
+    }
+
+    state = {
+        "technology_gate": {
+            "status": "NOT_STARTED",
+            "human_approval": False,
+            "proposal": {},
+        }
+    }
+
+    invalid_proposal = {
+        "components": {}
+    }
+
+    try:
+        submit_technology_proposal(
+            state,
+            config,
+            invalid_proposal,
+        )
+
+        assert False, "Expected ValueError"
+
+    except ValueError:
+        pass

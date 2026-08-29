@@ -47,3 +47,29 @@ def is_technology_gate_required(
         "recommend",
         "constrained",
     }
+
+
+def submit_technology_proposal(
+    state: dict[str, Any],
+    config: dict[str, Any],
+    proposal: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate and submit a technology proposal for human review."""
+
+    validate_technology_gate(
+        config,
+        proposal,
+    )
+
+    gate = state.get("technology_gate")
+
+    if not isinstance(gate, dict):
+        raise ValueError(
+            "Project state does not contain a valid technology_gate."
+        )
+
+    gate["proposal"] = proposal
+    gate["status"] = "REVIEW_REQUIRED"
+    gate["human_approval"] = False
+
+    return state
