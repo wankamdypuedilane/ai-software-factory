@@ -1,6 +1,7 @@
 from typing import Any
 
 from ai_factory.approvals import approve
+from ai_factory.orchestrator import activate_next_agent
 from ai_factory.transitions import set_agent_status
 
 
@@ -43,8 +44,13 @@ def apply_approval(
             f"Agent '{agent_name}' is not waiting for review."
         )
 
-    return set_agent_status(
+    state = set_agent_status(
         state,
         agent_name,
         "APPROVED",
+    )
+
+    return activate_next_agent(
+        state,
+        agent_name,
     )

@@ -14,7 +14,10 @@ def test_apply_product_scope_approval_approves_product() -> None:
         "agents": {
             "product": {
                 "status": "REVIEW_REQUIRED",
-            }
+            },
+            "ux_ui": {
+                "status": "NOT_STARTED",
+            },
         },
     }
 
@@ -25,6 +28,7 @@ def test_apply_product_scope_approval_approves_product() -> None:
 
     assert updated_state["approvals"]["product_scope"] is True
     assert updated_state["agents"]["product"]["status"] == "APPROVED"
+    assert updated_state["agents"]["ux_ui"]["status"] == "READY"
 
 
 def test_apply_design_approval_approves_ux_ui() -> None:
@@ -38,7 +42,10 @@ def test_apply_design_approval_approves_ux_ui() -> None:
         "agents": {
             "ux_ui": {
                 "status": "REVIEW_REQUIRED",
-            }
+            },
+            "architect": {
+                "status": "NOT_STARTED",
+            },
         },
         "design_gate": {
             "status": "READY_FOR_REVIEW",
@@ -60,6 +67,7 @@ def test_apply_design_approval_approves_ux_ui() -> None:
 
     assert updated_state["approvals"]["design"] is True
     assert updated_state["agents"]["ux_ui"]["status"] == "APPROVED"
+    assert updated_state["agents"]["architect"]["status"] == "READY"
 
 
 def test_apply_approval_rejects_agent_not_waiting_for_review() -> None:
