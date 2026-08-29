@@ -35,6 +35,14 @@ agents:
     status: NOT_STARTED
 
 approvals:
+  design_gate:
+    status: NOT_STARTED
+    passenger_screens_approved: 0
+    passenger_screens_total: 7
+    driver_screens_approved: 0
+    driver_screens_total: 7
+    figma_blocked: false
+    human_approval: false
   product_scope: false
   design: false
   architecture: false
