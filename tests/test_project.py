@@ -64,9 +64,9 @@ def test_initial_state_is_valid_yaml(tmp_path: Path) -> None:
     assert "design_gate" in state
     assert "design_gate" not in state["approvals"]
     assert state["design_gate"]["status"] == "NOT_STARTED"
-    assert state["design_gate"]["passenger_screens_approved"] == 0
-    assert state["design_gate"]["driver_screens_approved"] == 0
-    assert state["design_gate"]["figma_blocked"] is False
+    assert state["design_gate"]["groups"] == {}
+    assert state["design_gate"]["external_blockers"] == []
+    assert state["design_gate"]["human_approval"] is False
 
 
 def test_initialize_project_creates_project_configuration(tmp_path):

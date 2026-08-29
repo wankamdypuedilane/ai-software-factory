@@ -28,30 +28,42 @@ def show_status(project_root: Path) -> None:
     if "design_gate" in state:
         design_gate = get_design_gate(state)
 
-        figma_status = (
-            "yes" if design_gate["figma_blocked"] else "no"
+        groups = design_gate.get("groups", {})
+        external_blockers = design_gate.get(
+            "external_blockers",
+            [],
         )
 
         approval_status = (
             "approved"
-            if design_gate["human_approval"]
+            if design_gate.get("human_approval", False)
             else "pending"
         )
 
         print()
         print("Design Gate:")
-        print(f"  Status:            {design_gate['status']}")
         print(
-            "  Passenger screens: "
-            f"{design_gate['passenger_screens_approved']}/"
-            f"{design_gate['passenger_screens_total']}"
+            f"  Status:            "
+            f"{design_gate.get('status', 'UNKNOWN')}"
         )
-        print(
-            "  Driver screens:    "
-            f"{design_gate['driver_screens_approved']}/"
-            f"{design_gate['driver_screens_total']}"
-        )
-        print(f"  Figma blocked:     {figma_status}")
+
+        for group_name, group_data in groups.items():
+            approved = group_data.get("approved", 0)
+            total = group_data.get("total", 0)
+
+            print(
+                f"  {group_name.capitalize():<18}"
+                f"{approved}/{total}"
+            )
+
+        if external_blockers:
+            print(
+                "  External blockers: "
+                + ", ".join(external_blockers)
+            )
+        else:
+            print("  External blockers: none")
+
         print(f"  Human approval:    {approval_status}")
 
     next_agent = get_next_agent(state)
