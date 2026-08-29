@@ -1,5 +1,6 @@
 import pytest
 
+from ai_factory.state import save_state
 from ai_factory.transitions import set_agent_status
 
 
@@ -64,7 +65,41 @@ def test_set_agent_status_rejects_forbidden_transition() -> None:
         )
 
 
+def create_test_project_config(tmp_path, required_artifacts):
+    config_path = tmp_path / ".factory" / "project.yaml"
+
+    config = {
+        "schema_version": 1,
+        "project": {
+            "name": "Test Project",
+            "type": "test",
+        },
+        "capabilities": {
+            "ui": True,
+        },
+        "design": {
+            "enabled": True,
+            "groups": {},
+        },
+        "artifacts": {
+            "ux_ui": required_artifacts,
+        },
+    }
+
+    save_state(config_path, config)
+
+
 def test_ux_ui_cannot_request_review_with_missing_artifacts(tmp_path):
+    required_files = [
+        "knowledge/ux-ui/user-flows.md",
+        "knowledge/ux-ui/design-system.md",
+    ]
+
+    create_test_project_config(
+        tmp_path,
+        required_files,
+    )
+
     state = {
         "agents": {
             "ux_ui": {
@@ -96,6 +131,11 @@ def test_ux_ui_can_request_review_when_artifacts_exist(tmp_path):
         "knowledge/ux-ui/high-fidelity/driver-screens.md",
         "knowledge/ux-ui/high-fidelity/component-specs.md",
     ]
+
+    create_test_project_config(
+        tmp_path,
+        required_files,
+    )
 
     for relative_path in required_files:
         file_path = tmp_path / relative_path
