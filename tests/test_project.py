@@ -3,6 +3,7 @@ from pathlib import Path
 import yaml
 
 from ai_factory.project import initialize_project
+from ai_factory.state import load_state
 
 
 def test_initialize_project_creates_factory_state(tmp_path: Path) -> None:
@@ -67,4 +68,22 @@ def test_initial_state_is_valid_yaml(tmp_path: Path) -> None:
     assert state["design_gate"]["driver_screens_approved"] == 0
     assert state["design_gate"]["figma_blocked"] is False
 
-    
+
+def test_initialize_project_creates_project_configuration(tmp_path):
+    project_root = initialize_project(
+        project_name="Test Project",
+        target_dir=tmp_path,
+    )
+
+    config_path = project_root / ".factory" / "project.yaml"
+
+    assert config_path.exists()
+
+    config = load_state(config_path)
+
+    assert config["schema_version"] == 1
+    assert config["project"]["name"] == "Test Project"
+    assert config["capabilities"]["ui"] is True
+    assert config["design"]["enabled"] is True
+    assert config["design"]["groups"] == {}
+    assert config["artifacts"]["ux_ui"] == []
