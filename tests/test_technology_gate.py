@@ -1,4 +1,7 @@
+import pytest
+
 from ai_factory.technology_gate import (
+    approve_technology_gate,
     is_technology_gate_approved,
     is_technology_gate_required,
     submit_technology_proposal,
@@ -155,3 +158,57 @@ def test_submit_technology_proposal_rejects_invalid_proposal() -> None:
 
     except ValueError:
         pass
+
+
+def test_approve_technology_gate_succeeds_after_review() -> None:
+    state = {
+        "technology_gate": {
+            "status": "REVIEW_REQUIRED",
+            "human_approval": False,
+            "proposal": {
+                "components": {
+                    "backend": {
+                        "technology": "Example Backend",
+                        "rationale": "Fits the project requirements.",
+                    }
+                }
+            },
+        }
+    }
+
+    result = approve_technology_gate(state)
+
+    assert result["technology_gate"]["status"] == "APPROVED"
+    assert result["technology_gate"]["human_approval"] is True
+
+
+def test_approve_technology_gate_rejects_wrong_status() -> None:
+    state = {
+        "technology_gate": {
+            "status": "NOT_STARTED",
+            "human_approval": False,
+            "proposal": {},
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="can only be approved",
+    ):
+        approve_technology_gate(state)
+
+
+def test_approve_technology_gate_rejects_missing_proposal() -> None:
+    state = {
+        "technology_gate": {
+            "status": "REVIEW_REQUIRED",
+            "human_approval": False,
+            "proposal": {},
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="without a proposal",
+    ):
+        approve_technology_gate(state)

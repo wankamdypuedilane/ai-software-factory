@@ -73,3 +73,35 @@ def submit_technology_proposal(
     gate["human_approval"] = False
 
     return state
+
+
+def approve_technology_gate(
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """Record explicit human approval of a reviewed technology proposal."""
+
+    gate = state.get("technology_gate")
+
+    if not isinstance(gate, dict):
+        raise ValueError(
+            "Project state does not contain a valid technology_gate."
+        )
+
+    if gate.get("status") != "REVIEW_REQUIRED":
+        raise ValueError(
+            "Technology Gate can only be approved "
+            "when review is required."
+        )
+
+    proposal = gate.get("proposal")
+
+    if not isinstance(proposal, dict) or not proposal:
+        raise ValueError(
+            "Technology Gate cannot be approved "
+            "without a proposal."
+        )
+
+    gate["status"] = "APPROVED"
+    gate["human_approval"] = True
+
+    return state
