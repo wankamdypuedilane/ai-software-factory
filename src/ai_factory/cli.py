@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 from ai_factory.approvals import approve
+from ai_factory.design_gate import get_design_gate
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.state import load_state, save_state
@@ -23,6 +24,35 @@ def show_status(project_root: Path) -> None:
 
     for agent_name, agent_data in agents.items():
         print(f"{agent_name:<12} {agent_data['status']}")
+
+    if "design_gate" in state:
+        design_gate = get_design_gate(state)
+
+        figma_status = (
+            "yes" if design_gate["figma_blocked"] else "no"
+        )
+
+        approval_status = (
+            "approved"
+            if design_gate["human_approval"]
+            else "pending"
+        )
+
+        print()
+        print("Design Gate:")
+        print(f"  Status:            {design_gate['status']}")
+        print(
+            "  Passenger screens: "
+            f"{design_gate['passenger_screens_approved']}/"
+            f"{design_gate['passenger_screens_total']}"
+        )
+        print(
+            "  Driver screens:    "
+            f"{design_gate['driver_screens_approved']}/"
+            f"{design_gate['driver_screens_total']}"
+        )
+        print(f"  Figma blocked:     {figma_status}")
+        print(f"  Human approval:    {approval_status}")
 
     next_agent = get_next_agent(state)
 
