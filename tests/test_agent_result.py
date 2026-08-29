@@ -1,5 +1,6 @@
 from ai_factory.agent_result import (
     AgentArtifact,
+    AgentArtifactRequest,
     AgentResult,
 )
 
@@ -55,3 +56,51 @@ def test_agent_result_default_collections_are_independent() -> None:
 
     assert first.questions == ["A question"]
     assert second.questions == []
+
+
+def test_agent_result_stores_artifact_requests() -> None:
+    request = AgentArtifactRequest(
+        path="knowledge/product/requirements.md",
+        purpose="Document the approved MVP requirements.",
+    )
+
+    result = AgentResult(
+        status="COMPLETED",
+        summary="Product discovery completed.",
+        artifact_requests=[
+            request,
+        ],
+        handoff="ux_ui",
+    )
+
+    assert len(result.artifact_requests) == 1
+    assert (
+        result.artifact_requests[0].path
+        == "knowledge/product/requirements.md"
+    )
+    assert (
+        result.artifact_requests[0].purpose
+        == "Document the approved MVP requirements."
+    )
+
+
+def test_agent_result_artifact_request_defaults_are_independent() -> None:
+    first = AgentResult(
+        status="COMPLETED",
+        summary="First",
+    )
+
+    second = AgentResult(
+        status="COMPLETED",
+        summary="Second",
+    )
+
+    first.artifact_requests.append(
+        AgentArtifactRequest(
+            path="knowledge/test.md",
+            purpose="Test artifact.",
+        )
+    )
+
+    assert len(first.artifact_requests) == 1
+    assert second.artifact_requests == []
