@@ -6,6 +6,7 @@ from ai_factory.design_gate import get_design_gate
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.state import load_state, save_state
+from ai_factory.technology_gate import is_technology_gate_approved
 from ai_factory.transitions import set_agent_status
 
 
@@ -140,6 +141,21 @@ def main() -> None:
         help="Approval to record",
     )
 
+    technology_parser = subparsers.add_parser(
+        "technology",
+        help="Manage the project technology decision",
+    )
+
+    technology_subparsers = technology_parser.add_subparsers(
+        dest="technology_command",
+        required=True,
+    )
+
+    technology_subparsers.add_parser(
+        "status",
+        help="Display the current Technology Gate status",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -208,6 +224,52 @@ def main() -> None:
 
         except ValueError as error:
             parser.error(str(error))
+
+    elif args.command == "technology":
+        state_path = Path.cwd() / ".factory" / "state.yaml"
+        project_config_path = Path.cwd() / ".factory" / "project.yaml"
+
+        state = load_state(state_path)
+        config = load_state(project_config_path)
+
+        if args.technology_command == "status":
+            technology = config.get("technology", {})
+            gate = state.get("technology_gate", {})
+
+            selection_mode = technology.get(
+                "selection_mode",
+                "unknown",
+            )
+
+            print("Technology:")
+            print(f"  Selection mode:    {selection_mode}")
+            print(
+                f"  Gate status:       "
+                f"{gate.get('status', 'UNKNOWN')}"
+            )
+            print(
+                "  Human approval:    "
+                + (
+                    "approved"
+                    if gate.get("human_approval", False)
+                    else "pending"
+                )
+            )
+            print(
+                "  Gate approved:     "
+                + (
+                    "yes"
+                    if is_technology_gate_approved(state)
+                    else "no"
+                )
+            )
+
+            proposal = gate.get("proposal", {})
+
+            if proposal:
+                print("  Proposal:           available")
+            else:
+                print("  Proposal:           none")
 
 
 if __name__ == "__main__":
