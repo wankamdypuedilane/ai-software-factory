@@ -72,9 +72,15 @@ def test_run_next_agent_executes_selected_agent(
 
     assert agent_name == "architect"
 
-    assert output == (
-        "Mock execution completed for agent: architect"
+    assert output.status == "COMPLETED"
+    assert (
+        output.summary
+        == "Mock execution completed for agent: architect"
     )
+    assert output.artifacts == []
+    assert output.questions == []
+    assert output.blockers == []
+    assert output.handoff is None
 
 
 def test_run_next_agent_rejects_when_no_agent_is_ready(

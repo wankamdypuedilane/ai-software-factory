@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from ai_factory.agent_result import AgentResult
+
 
 class ModelProvider(ABC):
     """Interface implemented by AI model providers."""
@@ -9,7 +11,7 @@ class ModelProvider(ABC):
     def run(
         self,
         context: dict[str, Any],
-    ) -> str:
+    ) -> AgentResult:
         """Execute an agent using the supplied context."""
         raise NotImplementedError
 
@@ -20,10 +22,13 @@ class MockProvider(ModelProvider):
     def run(
         self,
         context: dict[str, Any],
-    ) -> str:
+    ) -> AgentResult:
         agent_name = context["agent_name"]
 
-        return (
-            f"Mock execution completed for agent: "
-            f"{agent_name}"
+        return AgentResult(
+            status="COMPLETED",
+            summary=(
+                f"Mock execution completed for agent: "
+                f"{agent_name}"
+            ),
         )

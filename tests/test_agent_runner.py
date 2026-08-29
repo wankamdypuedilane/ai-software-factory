@@ -88,4 +88,12 @@ def test_mock_provider_returns_deterministic_output() -> None:
         }
     )
 
-    assert result == "Mock execution completed for agent: architect"
+    assert result.status == "COMPLETED"
+    assert (
+        result.summary
+        == "Mock execution completed for agent: architect"
+    )
+    assert result.artifacts == []
+    assert result.questions == []
+    assert result.blockers == []
+    assert result.handoff is None
