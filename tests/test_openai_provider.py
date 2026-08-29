@@ -80,7 +80,18 @@ def test_openai_provider_run_builds_prompt_and_executes(
 
     def fake_execute(prompt: str) -> str:
         captured["prompt"] = prompt
-        return "model-output"
+
+        return """
+{
+  "status": "COMPLETED",
+  "summary": "Model execution completed.",
+  "artifacts": [],
+  "questions": [],
+  "blockers": [],
+  "handoff": null,
+  "metadata": {}
+}
+"""
 
     monkeypatch.setattr(
         provider,
@@ -108,10 +119,13 @@ def test_openai_provider_run_builds_prompt_and_executes(
 
     result = provider.run(context)
 
-    assert result == "model-output"
+    assert result.status == "COMPLETED"
+    assert result.summary == "Model execution completed."
+    assert result.artifacts == []
     assert "Agent: architect" in captured["prompt"]
     assert "Architect contract" in captured["prompt"]
     assert "Test Project" in captured["prompt"]
+    assert "## Required Output Format" in captured["prompt"]
 
 
 def test_openai_provider_execute_uses_responses_api(
@@ -152,3 +166,106 @@ def test_openai_provider_execute_uses_responses_api(
     assert captured["model"] == "test-model"
     assert captured["input"] == "prepared agent prompt"
     assert captured["max_output_tokens"] == 2000
+
+
+def test_openai_provider_parses_structured_agent_result(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+{
+  "status": "COMPLETED",
+  "summary": "Architecture proposal completed.",
+  "artifacts": [
+    {
+      "path": "knowledge/architecture/system.md",
+      "content": "# Architecture"
+    }
+  ],
+  "questions": [],
+  "blockers": [],
+  "handoff": "developer",
+  "metadata": {
+    "confidence": "high"
+  }
+}
+"""
+
+    result = provider._parse_result(raw_output)
+
+    assert result.status == "COMPLETED"
+    assert result.summary == "Architecture proposal completed."
+    assert len(result.artifacts) == 1
+    assert (
+        result.artifacts[0].path
+        == "knowledge/architecture/system.md"
+    )
+    assert result.artifacts[0].content == "# Architecture"
+    assert result.questions == []
+    assert result.blockers == []
+    assert result.handoff == "developer"
+    assert result.metadata["confidence"] == "high"
+
+
+def test_openai_provider_rejects_invalid_json(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="invalid structured agent result",
+    ):
+        provider._parse_result(
+            "not-json"
+        )
+
+
+def test_openai_provider_rejects_artifact_without_path(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+{
+  "status": "COMPLETED",
+  "summary": "Done.",
+  "artifacts": [
+    {
+      "content": "Missing path"
+    }
+  ],
+  "questions": [],
+  "blockers": [],
+  "handoff": null,
+  "metadata": {}
+}
+"""
+
+    with pytest.raises(
+        ValueError,
+        match="artifact path is required",
+    ):
+        provider._parse_result(raw_output)
