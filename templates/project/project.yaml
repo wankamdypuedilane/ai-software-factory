@@ -1,0 +1,32 @@
+schema_version: 1
+
+project:
+  name: null
+  type: null
+
+capabilities:
+  ui: true
+  backend: true
+  database: true
+  deployment: true
+
+design:
+  enabled: true
+  groups: {}
+
+artifacts:
+  ux_ui: []
+
+technology:
+  selection_mode: recommend
+
+  constraints: {}
+
+  selected:
+    frontend: {}
+    backend: {}
+    database: {}
+    mobile: {}
+    infrastructure: {}
+    ci_cd: {}
+    observability: {}

@@ -87,3 +87,12 @@ def test_initialize_project_creates_project_configuration(tmp_path):
     assert config["design"]["enabled"] is True
     assert config["design"]["groups"] == {}
     assert config["artifacts"]["ux_ui"] == []
+    assert config["technology"]["selection_mode"] == "recommend"
+    assert config["technology"]["constraints"] == {}
+    assert config["technology"]["selected"]["frontend"] == {}
+    assert config["technology"]["selected"]["backend"] == {}
+    assert config["technology"]["selected"]["database"] == {}
+    assert config["technology"]["selected"]["mobile"] == {}
+    assert config["technology"]["selected"]["infrastructure"] == {}
+    assert config["technology"]["selected"]["ci_cd"] == {}
+    assert config["technology"]["selected"]["observability"] == {}
