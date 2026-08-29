@@ -67,6 +67,10 @@ def test_initial_state_is_valid_yaml(tmp_path: Path) -> None:
     assert state["design_gate"]["groups"] == {}
     assert state["design_gate"]["external_blockers"] == []
     assert state["design_gate"]["human_approval"] is False
+    assert "technology_gate" in state
+    assert state["technology_gate"]["status"] == "NOT_STARTED"
+    assert state["technology_gate"]["human_approval"] is False
+    assert state["technology_gate"]["proposal"] == {}
 
 
 def test_initialize_project_creates_project_configuration(tmp_path):

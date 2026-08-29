@@ -46,6 +46,11 @@ design_gate:
   external_blockers: []
   human_approval: false
 
+technology_gate:
+  status: NOT_STARTED
+  human_approval: false
+  proposal: {}
+
 blockers: []
 
 artifacts: {}
