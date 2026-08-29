@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from ai_factory.approvals import approve
+from ai_factory.approval_runtime import apply_approval
 from ai_factory.design_gate import get_design_gate
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
@@ -334,7 +334,7 @@ def main() -> None:
         state = load_state(state_path)
 
         try:
-            state = approve(
+            state = apply_approval(
                 state,
                 args.approval_name,
             )
