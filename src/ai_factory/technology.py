@@ -133,3 +133,65 @@ def validate_proposal_constraints(
                 f"Technology '{proposed_technology}' is not allowed "
                 f"for component '{component_name}'."
             )
+
+
+def validate_manual_selection(
+    config: dict[str, Any],
+    proposal: dict[str, Any],
+) -> None:
+    """Ensure an Architect proposal respects a manually selected stack."""
+
+    selection_mode = validate_selection_mode(config)
+
+    if selection_mode != "manual":
+        return
+
+    technology_config = get_technology_config(config)
+    selected = technology_config.get("selected", {})
+
+    if not isinstance(selected, dict):
+        raise ValueError(
+            "Manually selected technologies must be a mapping."
+        )
+
+    validate_technology_proposal(proposal)
+
+    components = proposal["components"]
+
+    for component_name, selected_component in selected.items():
+        if not selected_component:
+            continue
+
+        if not isinstance(selected_component, dict):
+            raise ValueError(
+                f"Invalid manual selection for component: "
+                f"{component_name}"
+            )
+
+        selected_technology = selected_component.get("technology")
+
+        if not isinstance(
+            selected_technology,
+            str,
+        ) or not selected_technology.strip():
+            raise ValueError(
+                f"Technology is required for manually selected "
+                f"component: {component_name}"
+            )
+
+        if component_name not in components:
+            raise ValueError(
+                f"Manually selected component missing from proposal: "
+                f"{component_name}"
+            )
+
+        proposed_technology = components[
+            component_name
+        ]["technology"]
+
+        if proposed_technology != selected_technology:
+            raise ValueError(
+                f"Proposal cannot replace manually selected technology "
+                f"'{selected_technology}' for component "
+                f"'{component_name}'."
+            )

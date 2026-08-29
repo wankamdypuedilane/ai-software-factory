@@ -2,6 +2,7 @@ import pytest
 
 from ai_factory.technology import (
     get_technology_config,
+    validate_manual_selection,
     validate_proposal_constraints,
     validate_selection_mode,
     validate_technology_proposal,
@@ -245,3 +246,133 @@ def test_non_constrained_mode_does_not_apply_constraints() -> None:
         config,
         proposal,
     )
+
+
+def test_manual_mode_accepts_selected_technology() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "manual",
+            "selected": {
+                "backend": {
+                    "technology": "Example Backend",
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend",
+                "rationale": "Uses the manually selected technology.",
+            }
+        }
+    }
+
+    validate_manual_selection(config, proposal)
+
+
+def test_manual_mode_rejects_replacement_technology() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "manual",
+            "selected": {
+                "backend": {
+                    "technology": "Example Backend A",
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend B",
+                "rationale": "Alternative implementation.",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="cannot replace manually selected technology",
+    ):
+        validate_manual_selection(config, proposal)
+
+
+def test_manual_mode_requires_selected_component_in_proposal() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "manual",
+            "selected": {
+                "database": {
+                    "technology": "Example Database",
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend",
+                "rationale": "Backend implementation.",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Manually selected component missing",
+    ):
+        validate_manual_selection(config, proposal)
+
+
+def test_manual_mode_ignores_empty_selected_components() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "manual",
+            "selected": {
+                "frontend": {},
+                "backend": {
+                    "technology": "Example Backend",
+                },
+                "database": {},
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend",
+                "rationale": "Uses the selected backend.",
+            }
+        }
+    }
+
+    validate_manual_selection(config, proposal)
+
+
+def test_non_manual_mode_does_not_enforce_manual_selection() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "recommend",
+            "selected": {
+                "backend": {
+                    "technology": "Example Backend A",
+                }
+            },
+        }
+    }
+
+    proposal = {
+        "components": {
+            "backend": {
+                "technology": "Example Backend B",
+                "rationale": "Architect recommendation.",
+            }
+        }
+    }
+
+    validate_manual_selection(config, proposal)
