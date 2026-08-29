@@ -12,6 +12,7 @@ def build_agent_prompt(
     project = context["project"]
     state = context["state"]
     artifacts = context.get("artifacts", {})
+    human_input = context.get("human_input")
 
     sections = [
         f"# AI Software Factory Agent Execution",
@@ -52,6 +53,15 @@ def build_agent_prompt(
                     artifact_content.strip(),
                 ]
             )
+
+    if human_input:
+        sections.extend(
+            [
+                "",
+                "## Human Input",
+                human_input.strip(),
+            ]
+        )
 
     sections.extend(
         [

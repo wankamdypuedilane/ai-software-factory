@@ -70,3 +70,40 @@ def test_build_agent_prompt_omits_artifact_section_when_empty() -> None:
     prompt = build_agent_prompt(context)
 
     assert "## Context Artifacts" not in prompt
+
+
+def test_build_agent_prompt_includes_human_input() -> None:
+    context = {
+        "agent_name": "product",
+        "contract": "Product contract",
+        "project": {},
+        "state": {},
+        "artifacts": {},
+        "human_input": (
+            "# Product Input\n\n"
+            "Build a ride-hailing application for students."
+        ),
+    }
+
+    prompt = build_agent_prompt(context)
+
+    assert "## Human Input" in prompt
+    assert (
+        "Build a ride-hailing application for students."
+        in prompt
+    )
+
+
+def test_build_agent_prompt_omits_human_input_when_missing() -> None:
+    context = {
+        "agent_name": "product",
+        "contract": "Product contract",
+        "project": {},
+        "state": {},
+        "artifacts": {},
+        "human_input": None,
+    }
+
+    prompt = build_agent_prompt(context)
+
+    assert "## Human Input" not in prompt
