@@ -136,6 +136,7 @@ def main() -> None:
                 state,
                 args.agent_name,
                 args.status,
+                project_root=Path.cwd(),
             )
 
             save_state(state_path, state)
