@@ -1,6 +1,7 @@
 import os
 from typing import Any
 
+from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import ModelProvider
 
 
@@ -33,12 +34,17 @@ class OpenAIProvider(ModelProvider):
         self,
         context: dict[str, Any],
     ) -> str:
-        """
-        Execute an agent through OpenAI.
+        """Execute an agent through OpenAI."""
 
-        Real API execution will be added after the provider
-        configuration and request-building layers are validated.
-        """
+        prompt = build_agent_prompt(context)
+
+        return self._execute(prompt)
+
+    def _execute(
+        self,
+        prompt: str,
+    ) -> str:
+        """Send a prepared prompt to OpenAI."""
 
         raise NotImplementedError(
             "OpenAI API execution is not implemented yet."
