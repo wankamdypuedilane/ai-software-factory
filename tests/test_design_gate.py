@@ -32,11 +32,19 @@ def test_design_gate_not_ready_when_designs_are_incomplete() -> None:
     state = {
         "design_gate": {
             "status": "PARTIAL",
-            "passenger_screens_approved": 5,
-            "passenger_screens_total": 7,
-            "driver_screens_approved": 0,
-            "driver_screens_total": 7,
-            "figma_blocked": True,
+            "groups": {
+                "passenger": {
+                    "approved": 5,
+                    "total": 7,
+                },
+                "driver": {
+                    "approved": 0,
+                    "total": 7,
+                },
+            },
+            "external_blockers": [
+                "figma",
+            ],
             "human_approval": False,
         }
     }
@@ -48,11 +56,17 @@ def test_design_gate_ready_when_all_designs_are_complete() -> None:
     state = {
         "design_gate": {
             "status": "READY_FOR_REVIEW",
-            "passenger_screens_approved": 7,
-            "passenger_screens_total": 7,
-            "driver_screens_approved": 7,
-            "driver_screens_total": 7,
-            "figma_blocked": False,
+            "groups": {
+                "passenger": {
+                    "approved": 7,
+                    "total": 7,
+                },
+                "driver": {
+                    "approved": 7,
+                    "total": 7,
+                },
+            },
+            "external_blockers": [],
             "human_approval": False,
         }
     }

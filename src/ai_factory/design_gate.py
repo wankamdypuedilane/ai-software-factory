@@ -15,22 +15,34 @@ def get_design_gate(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def is_design_gate_ready(state: dict[str, Any]) -> bool:
-    """Return True when all required designs are ready for human approval."""
+    """Return True when all configured design groups are complete."""
 
     gate = get_design_gate(state)
 
-    passenger_complete = (
-        gate["passenger_screens_approved"]
-        == gate["passenger_screens_total"]
-    )
+    groups = gate.get("groups", {})
 
-    driver_complete = (
-        gate["driver_screens_approved"]
-        == gate["driver_screens_total"]
-    )
+    if not isinstance(groups, dict):
+        raise ValueError(
+            "Design gate groups must be a mapping."
+        )
 
-    return (
-        passenger_complete
-        and driver_complete
-        and not gate["figma_blocked"]
-    )
+    external_blockers = gate.get("external_blockers", [])
+
+    if not isinstance(external_blockers, list):
+        raise ValueError(
+            "Design gate external_blockers must be a list."
+        )
+
+    for group_name, group_data in groups.items():
+        if not isinstance(group_data, dict):
+            raise ValueError(
+                f"Invalid design group: {group_name}"
+            )
+
+        approved = group_data.get("approved", 0)
+        total = group_data.get("total", 0)
+
+        if approved != total:
+            return False
+
+    return len(external_blockers) == 0

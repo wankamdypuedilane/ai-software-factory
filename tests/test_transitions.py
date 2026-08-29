@@ -169,11 +169,19 @@ def test_ux_ui_cannot_be_approved_when_design_gate_is_not_ready() -> None:
         },
         "design_gate": {
             "status": "PARTIAL",
-            "passenger_screens_approved": 5,
-            "passenger_screens_total": 7,
-            "driver_screens_approved": 0,
-            "driver_screens_total": 7,
-            "figma_blocked": True,
+            "groups": {
+                "passenger": {
+                    "approved": 5,
+                    "total": 7,
+                },
+                "driver": {
+                    "approved": 0,
+                    "total": 7,
+                },
+            },
+            "external_blockers": [
+                "figma",
+            ],
             "human_approval": False,
         },
     }
