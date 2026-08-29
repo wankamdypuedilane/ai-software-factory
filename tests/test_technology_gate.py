@@ -1,5 +1,6 @@
 from ai_factory.technology_gate import (
     is_technology_gate_approved,
+    is_technology_gate_required,
     validate_technology_gate,
 )
 
@@ -52,3 +53,37 @@ def test_technology_gate_is_approved() -> None:
     }
 
     assert is_technology_gate_approved(state) is True
+
+
+def test_technology_gate_required_for_recommend_mode() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "recommend",
+        }
+    }
+
+    assert is_technology_gate_required(config) is True
+
+
+def test_technology_gate_required_for_constrained_mode() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "constrained",
+        }
+    }
+
+    assert is_technology_gate_required(config) is True
+
+
+def test_technology_gate_not_required_for_manual_mode() -> None:
+    config = {
+        "technology": {
+            "selection_mode": "manual",
+        }
+    }
+
+    assert is_technology_gate_required(config) is False
+
+
+def test_technology_gate_not_required_without_technology_config() -> None:
+    assert is_technology_gate_required({}) is False

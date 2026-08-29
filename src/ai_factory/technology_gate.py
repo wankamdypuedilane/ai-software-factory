@@ -29,3 +29,21 @@ def is_technology_gate_approved(
         gate.get("status") == "APPROVED"
         and gate.get("human_approval") is True
     )
+
+
+def is_technology_gate_required(
+    config: dict[str, Any],
+) -> bool:
+    """Return whether the project requires a technology approval gate."""
+
+    technology = config.get("technology")
+
+    if not isinstance(technology, dict):
+        return False
+
+    selection_mode = technology.get("selection_mode")
+
+    return selection_mode in {
+        "recommend",
+        "constrained",
+    }
