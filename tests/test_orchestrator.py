@@ -1,4 +1,4 @@
-from ai_factory.orchestrator import get_next_agent
+from ai_factory.orchestrator import get_execution_blocker, get_next_agent
 
 
 def test_get_next_agent_returns_product_when_ready() -> None:
@@ -50,3 +50,74 @@ def test_get_next_agent_stops_when_review_is_required() -> None:
     }
 
     assert get_next_agent(state) is None
+
+
+def test_get_execution_blocker_reports_design_gate_details() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+            },
+            "ux_ui": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "architect": {
+                "status": "NOT_STARTED",
+            },
+            "developer": {
+                "status": "NOT_STARTED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+            "security": {
+                "status": "NOT_STARTED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "design_gate": {
+            "status": "PARTIAL",
+            "groups": {
+                "passenger": {
+                    "approved": 5,
+                    "total": 7,
+                },
+                "driver": {
+                    "approved": 0,
+                    "total": 7,
+                },
+            },
+            "external_blockers": [
+                "figma",
+            ],
+            "human_approval": False,
+        },
+    }
+
+    blocker = get_execution_blocker(state)
+
+    assert blocker is not None
+    assert "UX/UI is waiting for Design Gate completion." in blocker
+    assert "Design Gate status: PARTIAL" in blocker
+    assert "Passenger: 5/7" in blocker
+    assert "Driver: 0/7" in blocker
+    assert "External blockers: figma" in blocker
+
+
+def test_get_execution_blocker_reports_blocked_agent() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "BLOCKED",
+            }
+        }
+    }
+
+    blocker = get_execution_blocker(state)
+
+    assert blocker == "Agent 'product' is blocked."

@@ -1,7 +1,10 @@
 from pathlib import Path
 
 from ai_factory.agent_runner import run_agent
-from ai_factory.orchestrator import get_next_agent
+from ai_factory.orchestrator import (
+    get_execution_blocker,
+    get_next_agent,
+)
 from ai_factory.providers import ModelProvider
 from ai_factory.state import load_state
 
@@ -18,6 +21,14 @@ def run_next_agent(
     agent_name = get_next_agent(state)
 
     if agent_name is None:
+        blocker = get_execution_blocker(state)
+
+        if blocker:
+            raise ValueError(
+                "Execution blocked.\n"
+                f"{blocker}"
+            )
+
         raise ValueError(
             "No agent is currently ready for execution."
         )

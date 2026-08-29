@@ -118,7 +118,7 @@ def test_run_next_agent_rejects_when_no_agent_is_ready(
 
     with pytest.raises(
         ValueError,
-        match="No agent is currently ready",
+        match="Execution blocked",
     ):
         run_next_agent(
             project_root=tmp_path,
