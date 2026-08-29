@@ -180,6 +180,83 @@ class OpenAIProvider(ModelProvider):
             "input": prompt,
         }
 
+        request_kwargs["text"] = {
+            "format": {
+                "type": "json_schema",
+                "name": "agent_result",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": [
+                                "COMPLETED",
+                                "NEEDS_INPUT",
+                                "BLOCKED",
+                                "REVIEW_REQUIRED",
+                            ],
+                        },
+                        "summary": {
+                            "type": "string",
+                        },
+                        "artifacts": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                    },
+                                },
+                                "required": [
+                                    "path",
+                                    "content",
+                                ],
+                                "additionalProperties": False,
+                            },
+                        },
+                        "questions": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                            },
+                        },
+                        "blockers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                            },
+                        },
+                        "handoff": {
+                            "type": [
+                                "string",
+                                "null",
+                            ],
+                        },
+                        "metadata": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {},
+                        },
+                    },
+                    "required": [
+                        "status",
+                        "summary",
+                        "artifacts",
+                        "questions",
+                        "blockers",
+                        "handoff",
+                        "metadata",
+                    ],
+                    "additionalProperties": False,
+                },
+            }
+        }
+
         max_output_tokens = self.settings.get(
             "max_output_tokens",
         )

@@ -166,6 +166,33 @@ def test_openai_provider_execute_uses_responses_api(
     assert captured["model"] == "test-model"
     assert captured["input"] == "prepared agent prompt"
     assert captured["max_output_tokens"] == 2000
+    assert "text" in captured
+    assert captured["text"]["format"]["type"] == "json_schema"
+    assert captured["text"]["format"]["name"] == "agent_result"
+    assert captured["text"]["format"]["strict"] is True
+
+    schema = captured["text"]["format"]["schema"]
+
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+
+    assert "status" in schema["properties"]
+    assert "summary" in schema["properties"]
+    assert "artifacts" in schema["properties"]
+    assert "questions" in schema["properties"]
+    assert "blockers" in schema["properties"]
+    assert "handoff" in schema["properties"]
+    assert "metadata" in schema["properties"]
+
+    assert set(schema["required"]) == {
+        "status",
+        "summary",
+        "artifacts",
+        "questions",
+        "blockers",
+        "handoff",
+        "metadata",
+    }
 
 
 def test_openai_provider_parses_structured_agent_result(
