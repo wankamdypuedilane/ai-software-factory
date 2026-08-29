@@ -30,3 +30,14 @@ technology:
     infrastructure: {}
     ci_cd: {}
     observability: {}
+
+context:
+  agents:
+    product: []
+    ux_ui: []
+    architect: []
+    developer: []
+    qa: []
+    security: []
+    devops: []
+    sre: []
