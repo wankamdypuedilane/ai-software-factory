@@ -184,6 +184,14 @@ def test_cli_run_executes_next_agent(
                     "architect": [],
                 }
             },
+            "ai": {
+                "provider": "mock",
+                "model": None,
+                "settings": {
+                    "temperature": None,
+                    "max_output_tokens": None,
+                },
+            },
         },
     )
 

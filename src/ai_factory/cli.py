@@ -5,7 +5,7 @@ from ai_factory.approvals import approve
 from ai_factory.design_gate import get_design_gate
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
-from ai_factory.providers import MockProvider
+from ai_factory.provider_factory import create_provider
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
 from ai_factory.technology_gate import (
@@ -212,11 +212,15 @@ def main() -> None:
             print("none")
 
     elif args.command == "run":
-        provider = MockProvider()
+        project_root = Path.cwd()
+        config_path = project_root / ".factory" / "project.yaml"
 
         try:
+            config = load_state(config_path)
+            provider = create_provider(config)
+
             agent_name, output = run_next_agent(
-                project_root=Path.cwd(),
+                project_root=project_root,
                 provider=provider,
             )
 
