@@ -49,3 +49,6 @@ ai:
   settings:
     temperature: null
     max_output_tokens: null
+
+inputs:
+  directory: knowledge/inputs

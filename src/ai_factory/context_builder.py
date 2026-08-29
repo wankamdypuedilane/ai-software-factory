@@ -42,6 +42,44 @@ def load_context_artifacts(
     return artifacts
 
 
+def load_agent_input(
+    project_root: Path,
+    project_config: dict[str, Any],
+    agent_name: str,
+) -> str | None:
+    """Load optional human input for a specific agent."""
+
+    inputs_config = project_config.get("inputs", {})
+
+    if not isinstance(inputs_config, dict):
+        raise ValueError(
+            "Project inputs configuration must be a mapping."
+        )
+
+    input_directory = inputs_config.get(
+        "directory",
+        "knowledge/inputs",
+    )
+
+    if not isinstance(input_directory, str):
+        raise ValueError(
+            "Project input directory must be a string."
+        )
+
+    input_path = (
+        project_root
+        / input_directory
+        / f"{agent_name}.md"
+    )
+
+    if not input_path.exists():
+        return None
+
+    return input_path.read_text(
+        encoding="utf-8",
+    )
+
+
 def build_agent_context(
     project_root: Path,
     agent_name: str,
@@ -63,10 +101,17 @@ def build_agent_context(
         agent_name=agent_name,
     )
 
+    human_input = load_agent_input(
+        project_root=project_root,
+        project_config=project_config,
+        agent_name=agent_name,
+    )
+
     return {
         "agent_name": agent_name,
         "contract": contract,
         "project": project_config,
         "state": state,
         "artifacts": artifacts,
+        "human_input": human_input,
     }

@@ -154,3 +154,115 @@ def test_build_agent_context_rejects_missing_artifact(
 
     except FileNotFoundError:
         pass
+
+
+def test_build_agent_context_loads_human_input(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    input_path = (
+        tmp_path
+        / "knowledge"
+        / "inputs"
+        / "product.md"
+    )
+
+    input_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    input_path.write_text(
+        "# Product Input\n\nBuild a ride-hailing application.",
+        encoding="utf-8",
+    )
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {
+                    "status": "READY",
+                }
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "context": {
+                "agents": {
+                    "product": [],
+                }
+            },
+            "inputs": {
+                "directory": "knowledge/inputs",
+            },
+        },
+    )
+
+    context = build_agent_context(
+        project_root=tmp_path,
+        agent_name="product",
+    )
+
+    assert context["human_input"] is not None
+    assert "Build a ride-hailing application." in context[
+        "human_input"
+    ]
+
+
+def test_build_agent_context_returns_none_without_human_input(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {
+                    "status": "READY",
+                }
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "context": {
+                "agents": {
+                    "product": [],
+                }
+            },
+            "inputs": {
+                "directory": "knowledge/inputs",
+            },
+        },
+    )
+
+    context = build_agent_context(
+        project_root=tmp_path,
+        agent_name="product",
+    )
+
+    assert context["human_input"] is None
