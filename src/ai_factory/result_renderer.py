@@ -54,6 +54,19 @@ def render_agent_result(
                 f"- {artifact.path}"
             )
 
+    if result.artifact_requests:
+        lines.extend(
+            [
+                "",
+                "Artifact requests:",
+            ]
+        )
+
+        for request in result.artifact_requests:
+            lines.append(
+                f"- {request.path}: {request.purpose}"
+            )
+
     lines.extend(
         [
             "",

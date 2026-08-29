@@ -39,6 +39,13 @@ def apply_agent_result(
             artifact.path
             for artifact in result.artifacts
         ],
+        "artifact_requests": [
+            {
+                "path": request.path,
+                "purpose": request.purpose,
+            }
+            for request in result.artifact_requests
+        ],
         "metadata": dict(result.metadata),
     }
 

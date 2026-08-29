@@ -2,6 +2,7 @@ import pytest
 
 from ai_factory.agent_result import (
     AgentArtifact,
+    AgentArtifactRequest,
     AgentResult,
 )
 from ai_factory.result_application import apply_agent_result
@@ -114,3 +115,42 @@ def test_apply_agent_result_rejects_unknown_agent() -> None:
             "unknown",
             result,
         )
+
+
+def test_apply_agent_result_records_artifact_requests() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "READY",
+            }
+        }
+    }
+
+    result = AgentResult(
+        status="COMPLETED",
+        summary="Product discovery completed.",
+        artifact_requests=[
+            AgentArtifactRequest(
+                path="knowledge/product/requirements.md",
+                purpose="Document the approved MVP requirements.",
+            )
+        ],
+        handoff="ux_ui",
+    )
+
+    updated_state = apply_agent_result(
+        state,
+        "product",
+        result,
+    )
+
+    requests = updated_state[
+        "agents"
+    ]["product"]["last_result"]["artifact_requests"]
+
+    assert requests == [
+        {
+            "path": "knowledge/product/requirements.md",
+            "purpose": "Document the approved MVP requirements.",
+        }
+    ]

@@ -73,3 +73,32 @@ def test_render_agent_result_omits_empty_optional_sections() -> None:
     assert "Blockers:" not in output
     assert "Artifacts:" not in output
     assert "Handoff: none" in output
+
+
+from ai_factory.agent_result import AgentArtifactRequest
+
+
+def test_render_agent_result_displays_artifact_requests() -> None:
+    result = AgentResult(
+        status="COMPLETED",
+        summary="Product discovery completed.",
+        artifact_requests=[
+            AgentArtifactRequest(
+                path="knowledge/product/requirements.md",
+                purpose="Document the approved MVP requirements.",
+            )
+        ],
+        handoff="ux_ui",
+    )
+
+    output = render_agent_result(
+        "product",
+        result,
+    )
+
+    assert "Artifact requests:" in output
+    assert (
+        "- knowledge/product/requirements.md: "
+        "Document the approved MVP requirements."
+        in output
+    )
