@@ -91,3 +91,28 @@ def set_agent_status(
     agents[agent_name]["status"] = status
 
     return state
+
+
+def resume_agent(
+    state: dict[str, Any],
+    agent_name: str,
+) -> dict[str, Any]:
+    """Resume a blocked agent after required human input is available."""
+
+    agents = state.get("agents", {})
+
+    if agent_name not in agents:
+        raise KeyError(
+            f"Unknown agent: {agent_name}"
+        )
+
+    current_status = agents[agent_name]["status"]
+
+    if current_status != "BLOCKED":
+        raise ValueError(
+            f"Agent '{agent_name}' is not blocked."
+        )
+
+    agents[agent_name]["status"] = "READY"
+
+    return state

@@ -1,7 +1,7 @@
 import pytest
 
 from ai_factory.state import save_state
-from ai_factory.transitions import set_agent_status
+from ai_factory.transitions import resume_agent, set_agent_status
 
 
 def test_set_agent_status_updates_status() -> None:
@@ -303,3 +303,54 @@ def test_architect_approval_does_not_require_gate_in_manual_mode(
     )
 
     assert result["agents"]["architect"]["status"] == "APPROVED"
+
+
+def test_resume_agent_moves_blocked_agent_to_ready() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "BLOCKED",
+            }
+        }
+    }
+
+    result = resume_agent(
+        state,
+        "product",
+    )
+
+    assert result["agents"]["product"]["status"] == "READY"
+
+
+def test_resume_agent_rejects_non_blocked_agent() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "READY",
+            }
+        }
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="is not blocked",
+    ):
+        resume_agent(
+            state,
+            "product",
+        )
+
+
+def test_resume_agent_rejects_unknown_agent() -> None:
+    state = {
+        "agents": {}
+    }
+
+    with pytest.raises(
+        KeyError,
+        match="Unknown agent",
+    ):
+        resume_agent(
+            state,
+            "unknown",
+        )
