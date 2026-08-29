@@ -6,7 +6,10 @@ from ai_factory.design_gate import get_design_gate
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.state import load_state, save_state
-from ai_factory.technology_gate import is_technology_gate_approved
+from ai_factory.technology_gate import (
+    is_technology_gate_approved,
+    submit_technology_proposal,
+)
 from ai_factory.transitions import set_agent_status
 
 
@@ -156,6 +159,16 @@ def main() -> None:
         help="Display the current Technology Gate status",
     )
 
+    technology_submit_parser = technology_subparsers.add_parser(
+        "submit",
+        help="Submit a technology proposal for human review",
+    )
+
+    technology_submit_parser.add_argument(
+        "proposal_file",
+        help="Path to a YAML technology proposal",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -270,6 +283,28 @@ def main() -> None:
                 print("  Proposal:           available")
             else:
                 print("  Proposal:           none")
+
+        elif args.technology_command == "submit":
+            proposal_path = Path(args.proposal_file)
+
+            if not proposal_path.is_absolute():
+                proposal_path = Path.cwd() / proposal_path
+
+            try:
+                proposal = load_state(proposal_path)
+
+                state = submit_technology_proposal(
+                    state,
+                    config,
+                    proposal,
+                )
+
+                save_state(state_path, state)
+
+                print("Technology proposal submitted for human review.")
+
+            except (ValueError, FileNotFoundError) as error:
+                parser.error(str(error))
 
 
 if __name__ == "__main__":
