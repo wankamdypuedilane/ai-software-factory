@@ -107,3 +107,43 @@ def test_openai_provider_run_builds_prompt_and_executes(
     assert "Agent: architect" in captured["prompt"]
     assert "Architect contract" in captured["prompt"]
     assert "Test Project" in captured["prompt"]
+
+
+def test_openai_provider_execute_uses_responses_api(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "max_output_tokens": 2000,
+        },
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        output_text = "generated-agent-output"
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    result = provider._execute(
+        "prepared agent prompt"
+    )
+
+    assert result == "generated-agent-output"
+    assert captured["model"] == "test-model"
+    assert captured["input"] == "prepared agent prompt"
+    assert captured["max_output_tokens"] == 2000

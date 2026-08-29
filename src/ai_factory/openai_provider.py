@@ -1,6 +1,8 @@
 import os
 from typing import Any
 
+from openai import OpenAI
+
 from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import ModelProvider
 
@@ -29,6 +31,9 @@ class OpenAIProvider(ModelProvider):
             )
 
         self.api_key = api_key
+        self.client = OpenAI(
+            api_key=self.api_key,
+        )
 
     def run(
         self,
@@ -46,6 +51,20 @@ class OpenAIProvider(ModelProvider):
     ) -> str:
         """Send a prepared prompt to OpenAI."""
 
-        raise NotImplementedError(
-            "OpenAI API execution is not implemented yet."
+        request_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "input": prompt,
+        }
+
+        max_output_tokens = self.settings.get(
+            "max_output_tokens",
         )
+
+        if max_output_tokens is not None:
+            request_kwargs["max_output_tokens"] = max_output_tokens
+
+        response = self.client.responses.create(
+            **request_kwargs,
+        )
+
+        return response.output_text
