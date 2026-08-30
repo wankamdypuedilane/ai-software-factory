@@ -18,6 +18,9 @@ from ai_factory.implementation_result import (
 from ai_factory.implementation_runtime import (
     run_implementation_task,
 )
+from ai_factory.test_runner import (
+    CommandExecutionResult,
+)
 
 
 @dataclass
@@ -26,6 +29,9 @@ class ImplementationBatchResult:
         default_factory=list
     )
     written_files: list[Path] = field(
+        default_factory=list
+    )
+    test_results: list[CommandExecutionResult] = field(
         default_factory=list
     )
     blocked: bool = False
@@ -70,6 +76,10 @@ def run_implementation_batch(
         )
 
         result = execution.result
+
+        batch.test_results.extend(
+            execution.test_results
+        )
 
         batch.results.append(
             result

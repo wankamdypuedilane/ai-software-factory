@@ -85,6 +85,7 @@ def test_run_implementation_batch_executes_tasks_sequentially(
     assert len(batch.results) == 2
     assert len(batch.written_files) == 2
     assert batch.blocked is False
+    assert batch.test_results == []
 
     assert batch.results[0].task_id == "US-001"
     assert batch.results[1].task_id == "US-002"
@@ -248,6 +249,17 @@ def test_run_implementation_batch_stops_when_tests_fail(
 
     assert batch.test_failed is True
     assert batch.failed_task_id == "US-001"
+    assert len(batch.test_results) == 1
+
+    test_result = batch.test_results[0]
+
+    assert (
+        test_result.command
+        == "python -m pytest tests/test_auth.py -q"
+    )
+
+    assert test_result.returncode != 0
+    assert test_result.passed is False
     assert batch.blocked is False
 
     assert len(batch.results) == 1
