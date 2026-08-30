@@ -85,6 +85,83 @@ def build_implementation_result_schema() -> dict:
     }
 
 
+def build_qa_result_schema() -> dict:
+    """Build the strict JSON schema for QA results."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string",
+            },
+            "passed": {
+                "type": "boolean",
+            },
+            "defects": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                        },
+                        "title": {
+                            "type": "string",
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "Critical",
+                                "High",
+                                "Medium",
+                                "Low",
+                            ],
+                        },
+                        "related_story": {
+                            "type": "string",
+                        },
+                        "expected": {
+                            "type": "string",
+                        },
+                        "actual": {
+                            "type": "string",
+                        },
+                    },
+                    "required": [
+                        "id",
+                        "title",
+                        "severity",
+                        "related_story",
+                        "expected",
+                        "actual",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "test_commands": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "blockers": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+        },
+        "required": [
+            "summary",
+            "passed",
+            "defects",
+            "test_commands",
+            "blockers",
+        ],
+        "additionalProperties": False,
+    }
+
+
 class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 

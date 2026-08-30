@@ -3,6 +3,7 @@ import pytest
 from ai_factory.openai_provider import (
     OpenAIProvider,
     build_implementation_result_schema,
+    build_qa_result_schema,
 )
 
 
@@ -731,6 +732,50 @@ def test_build_implementation_result_schema() -> None:
 
     assert file_schema["properties"]["operation"]["enum"] == [
         "write"
+    ]
+
+
+def test_build_qa_result_schema() -> None:
+    schema = build_qa_result_schema()
+
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+
+    assert set(schema["required"]) == {
+        "summary",
+        "passed",
+        "defects",
+        "test_commands",
+        "blockers",
+    }
+
+    properties = schema["properties"]
+
+    assert "summary" in properties
+    assert "passed" in properties
+    assert "defects" in properties
+    assert "test_commands" in properties
+    assert "blockers" in properties
+
+    defect_schema = properties["defects"]["items"]
+
+    assert defect_schema["type"] == "object"
+    assert defect_schema["additionalProperties"] is False
+
+    assert set(defect_schema["required"]) == {
+        "id",
+        "title",
+        "severity",
+        "related_story",
+        "expected",
+        "actual",
+    }
+
+    assert defect_schema["properties"]["severity"]["enum"] == [
+        "Critical",
+        "High",
+        "Medium",
+        "Low",
     ]
 
 
