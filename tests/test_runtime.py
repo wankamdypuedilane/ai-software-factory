@@ -697,6 +697,7 @@ def test_run_next_agent_executes_developer_implementation_batch(
         last_result["implementation_blocked"]
         is False
     )
+    assert last_result["implementation_blockers"] == []
 
     assert (
         tmp_path / "src" / "auth.py"
@@ -816,6 +817,14 @@ def test_run_next_agent_blocks_developer_when_implementation_batch_blocks(
     last_result = developer["last_result"]
 
     assert last_result["implementation_blocked"] is True
+    assert last_result["implementation_blockers"] == [
+        {
+            "task_id": "US-001",
+            "blockers": [
+                "Authentication requirement is ambiguous.",
+            ],
+        }
+    ]
     assert len(last_result["implementation_results"]) == 1
     assert (
         last_result["implementation_results"][0]["task_id"]

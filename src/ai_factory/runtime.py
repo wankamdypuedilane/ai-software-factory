@@ -113,6 +113,15 @@ def run_next_agent(
             implementation_batch.blocked
         )
 
+        developer_result["implementation_blockers"] = [
+            {
+                "task_id": item.task_id,
+                "blockers": list(item.blockers),
+            }
+            for item in implementation_batch.results
+            if item.blockers
+        ]
+
         if implementation_batch.blocked:
             state["agents"][agent_name]["status"] = "BLOCKED"
 
