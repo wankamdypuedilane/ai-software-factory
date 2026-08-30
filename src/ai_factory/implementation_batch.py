@@ -60,19 +60,21 @@ def run_implementation_batch(
     batch = ImplementationBatchResult()
 
     for task in tasks:
-        result, written_files = run_implementation_task(
+        execution = run_implementation_task(
             project_root=project_root,
             task=task,
             context=context,
             provider=provider,
         )
 
+        result = execution.result
+
         batch.results.append(
             result
         )
 
         batch.written_files.extend(
-            written_files
+            execution.written_files
         )
 
         if result.blockers:

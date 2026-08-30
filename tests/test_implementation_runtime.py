@@ -53,16 +53,13 @@ def test_run_implementation_task_executes_and_writes_files(
                 content="# tests",
             ),
         ],
-        tests=[
-            "pytest tests/test_auth.py",
-        ],
     )
 
     provider = FakeImplementationProvider(
         result
     )
 
-    implementation_result, written = run_implementation_task(
+    execution = run_implementation_task(
         project_root=tmp_path,
         task=task,
         context={
@@ -74,8 +71,10 @@ def test_run_implementation_task_executes_and_writes_files(
         provider=provider,
     )
 
-    assert implementation_result is result
-    assert len(written) == 2
+    assert execution.result is result
+    assert len(execution.written_files) == 2
+    assert execution.test_results == []
+    assert execution.tests_passed is True
 
     assert (
         tmp_path / "src" / "accounts" / "models.py"
@@ -150,19 +149,72 @@ def test_run_implementation_task_does_not_write_when_blocked(
         result
     )
 
-    implementation_result, written = run_implementation_task(
+    execution = run_implementation_task(
         project_root=tmp_path,
         task=task,
         context={},
         provider=provider,
     )
 
-    assert implementation_result.blockers == [
+    assert execution.result.blockers == [
         "Authentication requirement is ambiguous."
     ]
 
-    assert written == []
+    assert execution.written_files == []
+    assert execution.test_results == []
+    assert execution.tests_passed is True
 
     assert not (
         tmp_path / "src" / "accounts" / "models.py"
     ).exists()
+
+
+def test_run_implementation_task_executes_declared_tests(
+    tmp_path: Path,
+) -> None:
+    test_file = (
+        tmp_path
+        / "tests"
+        / "test_sample.py"
+    )
+
+    test_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    test_file.write_text(
+        "def test_sample():\n"
+        "    assert 1 + 1 == 2\n",
+        encoding="utf-8",
+    )
+
+    task = ImplementationTask(
+        agent_name="developer",
+        id="US-010",
+        title="Sample test",
+        purpose="Validate test execution.",
+    )
+
+    result = ImplementationResult(
+        task_id="US-010",
+        summary="Sample implementation.",
+        tests=[
+            "python -m pytest tests/test_sample.py -q",
+        ],
+    )
+
+    provider = FakeImplementationProvider(
+        result
+    )
+
+    execution = run_implementation_task(
+        project_root=tmp_path,
+        task=task,
+        context={},
+        provider=provider,
+    )
+
+    assert len(execution.test_results) == 1
+    assert execution.test_results[0].passed is True
+    assert execution.tests_passed is True
