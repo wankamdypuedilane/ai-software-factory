@@ -46,6 +46,14 @@ def apply_agent_result(
             }
             for request in result.artifact_requests
         ],
+        "implementation_requests": [
+            {
+                "id": request.id,
+                "title": request.title,
+                "purpose": request.purpose,
+            }
+            for request in result.implementation_requests
+        ],
         "metadata": dict(result.metadata),
     }
 

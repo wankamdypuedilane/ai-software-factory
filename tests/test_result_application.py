@@ -3,6 +3,7 @@ import pytest
 from ai_factory.agent_result import (
     AgentArtifact,
     AgentArtifactRequest,
+    AgentImplementationRequest,
     AgentResult,
 )
 from ai_factory.result_application import apply_agent_result
@@ -153,4 +154,55 @@ def test_apply_agent_result_records_artifact_requests() -> None:
             "path": "knowledge/product/requirements.md",
             "purpose": "Document the approved MVP requirements.",
         }
+    ]
+
+
+def test_apply_agent_result_records_implementation_requests() -> None:
+    state = {
+        "agents": {
+            "developer": {
+                "status": "READY",
+            }
+        }
+    }
+
+    result = AgentResult(
+        status="COMPLETED",
+        summary="Implementation planning completed.",
+        implementation_requests=[
+            AgentImplementationRequest(
+                id="US-001",
+                title="Passenger authentication",
+                purpose="Implement authentication with automated tests.",
+            ),
+            AgentImplementationRequest(
+                id="US-002",
+                title="Ride request workflow",
+                purpose="Implement ride creation and status handling.",
+            ),
+        ],
+        handoff="qa",
+    )
+
+    updated_state = apply_agent_result(
+        state,
+        "developer",
+        result,
+    )
+
+    requests = updated_state[
+        "agents"
+    ]["developer"]["last_result"]["implementation_requests"]
+
+    assert requests == [
+        {
+            "id": "US-001",
+            "title": "Passenger authentication",
+            "purpose": "Implement authentication with automated tests.",
+        },
+        {
+            "id": "US-002",
+            "title": "Ride request workflow",
+            "purpose": "Implement ride creation and status handling.",
+        },
     ]
