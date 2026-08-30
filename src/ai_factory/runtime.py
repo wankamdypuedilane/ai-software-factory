@@ -9,6 +9,12 @@ from ai_factory.design_gate_runtime import (
 from ai_factory.implementation_batch import (
     run_implementation_batch,
 )
+from ai_factory.implementation_history import (
+    merge_implementation_results,
+)
+from ai_factory.implementation_resume import (
+    get_completed_implementation_task_ids,
+)
 from ai_factory.orchestrator import (
     get_execution_blocker,
     get_next_agent,
@@ -60,12 +66,19 @@ def run_next_agent(
     implementation_batch = None
 
     if agent_name == "developer":
+        completed_task_ids = (
+            get_completed_implementation_task_ids(
+                state
+            )
+        )
+
         implementation_batch = run_implementation_batch(
             project_root=project_root,
             agent_name=agent_name,
             agent_result=result,
             context=context,
             provider=provider,
+            completed_task_ids=completed_task_ids,
         )
 
     generated_artifacts = run_artifact_generation(
@@ -81,6 +94,31 @@ def run_next_agent(
         for artifact in generated_artifacts
     ]
 
+    previous_implementation_results = []
+
+    if agent_name == "developer":
+        previous_developer_state = state["agents"].get(
+            "developer",
+            {},
+        )
+
+        if isinstance(previous_developer_state, dict):
+            previous_last_result = previous_developer_state.get(
+                "last_result",
+                {},
+            )
+
+            if isinstance(previous_last_result, dict):
+                stored_results = previous_last_result.get(
+                    "implementation_results",
+                    [],
+                )
+
+                if isinstance(stored_results, list):
+                    previous_implementation_results = list(
+                        stored_results
+                    )
+
     state = apply_agent_result(
         state,
         agent_name,
@@ -90,7 +128,7 @@ def run_next_agent(
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 
-        developer_result["implementation_results"] = [
+        new_implementation_results = [
             {
                 "task_id": item.task_id,
                 "summary": item.summary,
@@ -103,6 +141,13 @@ def run_next_agent(
             }
             for item in implementation_batch.results
         ]
+
+        developer_result["implementation_results"] = (
+            merge_implementation_results(
+                previous_results=previous_implementation_results,
+                new_results=new_implementation_results,
+            )
+        )
 
         developer_result["implemented_files"] = [
             path.relative_to(project_root).as_posix()

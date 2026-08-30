@@ -832,3 +832,165 @@ def test_run_next_agent_blocks_developer_when_implementation_batch_blocks(
     )
 
     assert provider.implementation_index == 1
+
+
+def test_run_next_agent_skips_previously_completed_developer_tasks(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {
+                    "status": "READY",
+                    "last_result": {
+                        "implementation_results": [
+                            {
+                                "task_id": "US-001",
+                                "summary": "Authentication implemented.",
+                                "tests": [],
+                                "blockers": [],
+                                "files": [
+                                    "src/auth.py",
+                                ],
+                            },
+                            {
+                                "task_id": "US-002",
+                                "summary": "Blocked.",
+                                "tests": [],
+                                "blockers": [
+                                    "Requirement is ambiguous.",
+                                ],
+                                "files": [],
+                            },
+                        ],
+                    },
+                },
+                "qa": {"status": "NOT_STARTED"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "developer": [],
+                }
+            },
+        },
+    )
+
+    class ResumeDeveloperProvider(DevelopmentModelProvider):
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Implementation replanned.",
+                implementation_requests=[
+                    AgentImplementationRequest(
+                        id="US-001",
+                        title="Authentication",
+                        purpose="Implement authentication.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-002",
+                        title="Ride creation",
+                        purpose="Implement ride creation.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-003",
+                        title="Ride completion",
+                        purpose="Implement ride completion.",
+                    ),
+                ],
+                handoff="qa",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            self.prompts.append(prompt)
+
+            if len(self.prompts) == 1:
+                return ImplementationResult(
+                    task_id="US-002",
+                    summary="Ride creation implemented.",
+                )
+
+            return ImplementationResult(
+                task_id="US-003",
+                summary="Ride completion implemented.",
+            )
+
+    provider = ResumeDeveloperProvider()
+
+    agent_name, _ = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    developer = updated_state["agents"]["developer"]
+    last_result = developer["last_result"]
+
+    history = last_result["implementation_results"]
+
+    assert agent_name == "developer"
+
+    assert len(provider.prompts) == 2
+
+    assert "Task ID: US-001" not in provider.prompts[0]
+    assert "Task ID: US-002" in provider.prompts[0]
+    assert "Task ID: US-003" in provider.prompts[1]
+
+    assert [
+        item["task_id"]
+        for item in history
+    ] == [
+        "US-001",
+        "US-002",
+        "US-003",
+    ]
+
+    assert history[0]["summary"] == (
+        "Authentication implemented."
+    )
+
+    assert history[1]["summary"] == (
+        "Ride creation implemented."
+    )
+
+    assert history[1]["blockers"] == []
+
+    assert history[2]["summary"] == (
+        "Ride completion implemented."
+    )
