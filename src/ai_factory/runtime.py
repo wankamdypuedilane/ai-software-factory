@@ -178,6 +178,14 @@ def run_next_agent(
             implementation_batch.blocked
         )
 
+        developer_result["implementation_test_failed"] = (
+            implementation_batch.test_failed
+        )
+
+        developer_result["failed_task_id"] = (
+            implementation_batch.failed_task_id
+        )
+
         developer_result["implementation_blockers"] = [
             {
                 "task_id": item.task_id,
@@ -196,6 +204,9 @@ def run_next_agent(
 
         if implementation_batch.blocked:
             state["agents"][agent_name]["status"] = "BLOCKED"
+
+        elif implementation_batch.test_failed:
+            state["agents"][agent_name]["status"] = "FAILED"
 
     if generated_paths:
         state["agents"][agent_name]["last_result"][

@@ -1033,3 +1033,118 @@ def test_run_next_agent_skips_previously_completed_developer_tasks(
     assert history[2]["summary"] == (
         "Ride completion implemented."
     )
+
+
+def test_run_next_agent_marks_developer_failed_when_tests_fail(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "READY"},
+                "qa": {"status": "NOT_STARTED"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "developer": [],
+                }
+            },
+        },
+    )
+
+    class FailingDeveloperProvider(DevelopmentModelProvider):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Implementation planned.",
+                implementation_requests=[
+                    AgentImplementationRequest(
+                        id="US-001",
+                        title="Authentication",
+                        purpose="Implement authentication.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-002",
+                        title="Ride creation",
+                        purpose="Implement ride creation.",
+                    ),
+                ],
+                handoff="qa",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            return ImplementationResult(
+                task_id="US-001",
+                summary="Authentication implemented.",
+                files=[
+                    ImplementationFileChange(
+                        path="tests/test_auth.py",
+                        content=(
+                            "def test_auth():\n"
+                            "    assert False\n"
+                        ),
+                    )
+                ],
+                tests=[
+                    "python -m pytest tests/test_auth.py -q",
+                ],
+            )
+
+    provider = FailingDeveloperProvider()
+
+    agent_name, result = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "developer"
+    assert result.status == "COMPLETED"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    developer = updated_state["agents"]["developer"]
+
+    assert developer["status"] == "FAILED"
+
+    last_result = developer["last_result"]
+
+    assert last_result["implementation_test_failed"] is True
+    assert last_result["failed_task_id"] == "US-001"
+    assert last_result["implementation_blocked"] is False
+
+    assert len(
+        last_result["implementation_results"]
+    ) == 1
