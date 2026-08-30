@@ -371,16 +371,16 @@ class OpenAIProvider(ModelProvider):
                             "type": "object",
                             "properties": {
                                 "technology_proposal": {
-                                    "type": [
-                                        "object",
-                                        "null",
-                                    ],
+                                    "type": "object",
                                     "properties": {
                                         "components": {
-                                            "type": "object",
-                                            "additionalProperties": {
+                                            "type": "array",
+                                            "items": {
                                                 "type": "object",
                                                 "properties": {
+                                                    "name": {
+                                                        "type": "string",
+                                                    },
                                                     "technology": {
                                                         "type": "string",
                                                     },
@@ -389,6 +389,7 @@ class OpenAIProvider(ModelProvider):
                                                     },
                                                 },
                                                 "required": [
+                                                    "name",
                                                     "technology",
                                                     "rationale",
                                                 ],

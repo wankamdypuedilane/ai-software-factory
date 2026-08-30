@@ -9,6 +9,31 @@ from ai_factory.technology_runtime import (
 
 def test_build_technology_proposal_from_architect_result() -> None:
     proposal = {
+        "components": [
+            {
+                "name": "frontend",
+                "technology": "React",
+                "rationale": "Suitable for the web UI.",
+            },
+            {
+                "name": "backend",
+                "technology": "Django",
+                "rationale": "Suitable for the monolithic backend.",
+            },
+        ]
+    }
+
+    result = AgentResult(
+        status="COMPLETED",
+        summary="Architecture completed.",
+        metadata={
+            "technology_proposal": proposal,
+        },
+    )
+
+    assert build_technology_proposal_from_architect_result(
+        result
+    ) == {
         "components": {
             "frontend": {
                 "technology": "React",
@@ -20,19 +45,6 @@ def test_build_technology_proposal_from_architect_result() -> None:
             },
         }
     }
-
-    result = AgentResult(
-        status="COMPLETED",
-        summary="Architecture completed.",
-        metadata={
-            "technology_proposal": proposal,
-        },
-    )
-
-    assert (
-        build_technology_proposal_from_architect_result(result)
-        == proposal
-    )
 
 
 def test_build_technology_proposal_rejects_missing_proposal() -> None:
@@ -72,12 +84,13 @@ def test_update_technology_gate_submits_architect_proposal() -> None:
         summary="Architecture completed.",
         metadata={
             "technology_proposal": {
-                "components": {
-                    "frontend": {
+                "components": [
+                    {
+                        "name": "frontend",
                         "technology": "React",
                         "rationale": "Suitable for the web UI.",
                     },
-                }
+                ]
             }
         },
     )
@@ -92,9 +105,14 @@ def test_update_technology_gate_submits_architect_proposal() -> None:
 
     assert gate["status"] == "REVIEW_REQUIRED"
     assert gate["human_approval"] is False
-    assert gate["proposal"] == result.metadata[
-        "technology_proposal"
-    ]
+    assert gate["proposal"] == {
+        "components": {
+            "frontend": {
+                "technology": "React",
+                "rationale": "Suitable for the web UI.",
+            }
+        }
+    }
 
 
 def test_update_technology_gate_skips_when_gate_not_required() -> None:

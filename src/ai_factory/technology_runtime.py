@@ -10,18 +10,61 @@ from ai_factory.technology_gate import (
 def build_technology_proposal_from_architect_result(
     result: AgentResult,
 ) -> dict[str, Any]:
-    """Build a technology proposal from an Architect Agent result."""
+    """Build a Technology Gate proposal from Architect metadata."""
 
-    proposal = result.metadata.get(
+    raw_proposal = result.metadata.get(
         "technology_proposal"
     )
 
-    if not isinstance(proposal, dict) or not proposal:
+    if not isinstance(raw_proposal, dict):
         raise ValueError(
             "Architect result does not contain a technology proposal."
         )
 
-    return proposal
+    raw_components = raw_proposal.get(
+        "components"
+    )
+
+    if not isinstance(raw_components, list) or not raw_components:
+        raise ValueError(
+            "Architect technology proposal does not contain components."
+        )
+
+    components: dict[str, Any] = {}
+
+    for component in raw_components:
+        if not isinstance(component, dict):
+            raise ValueError(
+                "Invalid technology proposal component."
+            )
+
+        name = component.get("name")
+        technology = component.get("technology")
+        rationale = component.get("rationale")
+
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(
+                "Technology component name is required."
+            )
+
+        if not isinstance(technology, str) or not technology.strip():
+            raise ValueError(
+                f"Technology is required for component '{name}'."
+            )
+
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise ValueError(
+                f"Rationale is required for component '{name}'."
+            )
+
+        components[name] = {
+            "technology": technology,
+            "rationale": rationale,
+        }
+
+    return {
+        "components": components,
+    }
 
 
 def update_technology_gate_from_architect_result(
