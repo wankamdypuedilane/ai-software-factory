@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import pytest
 
 from ai_factory.approval_runtime import apply_approval
+from ai_factory.state import save_state
 
 
 def test_apply_product_scope_approval_approves_product() -> None:
@@ -95,3 +98,131 @@ def test_apply_approval_rejects_agent_not_waiting_for_review() -> None:
             state,
             "product_scope",
         )
+
+
+def test_apply_architecture_approval_requires_approved_technology_gate(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "technology": {
+                "selection_mode": "recommend",
+                "constraints": {},
+                "selected": {},
+            }
+        },
+    )
+
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "developer": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "technology_gate": {
+            "status": "REVIEW_REQUIRED",
+            "human_approval": False,
+            "proposal": {
+                "components": {
+                    "backend": {
+                        "technology": "Django",
+                        "rationale": "Backend framework.",
+                    }
+                }
+            },
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Technology Gate is not approved",
+    ):
+        apply_approval(
+            state,
+            "architecture",
+            project_root=tmp_path,
+        )
+
+
+def test_apply_architecture_approval_activates_developer(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "technology": {
+                "selection_mode": "recommend",
+                "constraints": {},
+                "selected": {
+                    "backend": {
+                        "technology": "Django",
+                        "rationale": "Backend framework.",
+                    }
+                },
+            }
+        },
+    )
+
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "developer": {
+                "status": "NOT_STARTED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+            "security": {
+                "status": "NOT_STARTED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "technology_gate": {
+            "status": "APPROVED",
+            "human_approval": True,
+            "proposal": {
+                "components": {
+                    "backend": {
+                        "technology": "Django",
+                        "rationale": "Backend framework.",
+                    }
+                }
+            },
+        },
+    }
+
+    updated_state = apply_approval(
+        state,
+        "architecture",
+        project_root=tmp_path,
+    )
+
+    assert updated_state["agents"]["architect"]["status"] == "APPROVED"
+    assert updated_state["agents"]["developer"]["status"] == "READY"

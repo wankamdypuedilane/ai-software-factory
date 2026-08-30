@@ -356,6 +356,7 @@ def main() -> None:
             state = apply_approval(
                 state,
                 args.approval_name,
+                project_root=Path.cwd(),
             )
 
             save_state(state_path, state)

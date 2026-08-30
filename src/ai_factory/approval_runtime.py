@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from ai_factory.approvals import approve
@@ -15,6 +16,7 @@ APPROVAL_AGENT_MAP = {
 def apply_approval(
     state: dict[str, Any],
     approval_name: str,
+    project_root: Path | None = None,
 ) -> dict[str, Any]:
     """Apply a human approval and advance its owning agent."""
 
@@ -59,6 +61,7 @@ def apply_approval(
         state,
         agent_name,
         "APPROVED",
+        project_root=project_root,
     )
 
     return activate_next_agent(
