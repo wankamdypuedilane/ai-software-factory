@@ -850,3 +850,146 @@ def test_parse_implementation_result_rejects_unsupported_operation(
         provider._parse_implementation_result(
             raw_output
         )
+
+
+def test_openai_provider_implement_returns_structured_result(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "max_output_tokens": 2500,
+        },
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = """
+        {
+            "task_id": "US-001",
+            "summary": "Authentication implemented.",
+            "files": [
+                {
+                    "path": "src/accounts/models.py",
+                    "content": "# models",
+                    "operation": "write"
+                }
+            ],
+            "tests": [
+                "pytest tests/test_auth.py"
+            ],
+            "blockers": []
+        }
+        """
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    result = provider.implement(
+        "implementation prompt"
+    )
+
+    assert result.task_id == "US-001"
+    assert result.summary == "Authentication implemented."
+    assert len(result.files) == 1
+    assert result.files[0].path == "src/accounts/models.py"
+
+    assert captured["model"] == "test-model"
+    assert captured["input"] == "implementation prompt"
+    assert captured["max_output_tokens"] == 2500
+
+    response_format = captured["text"]["format"]
+
+    assert response_format["type"] == "json_schema"
+    assert response_format["name"] == "implementation_result"
+    assert response_format["strict"] is True
+
+
+def test_openai_provider_implement_rejects_incomplete_response(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeResponse:
+        status = "incomplete"
+        incomplete_details = "max_output_tokens"
+        output_text = ""
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="implementation response was incomplete",
+    ):
+        provider.implement(
+            "implementation prompt"
+        )
+
+
+def test_openai_provider_implement_handles_rate_limit(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeRateLimitError(Exception):
+        pass
+
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.RateLimitError",
+        FakeRateLimitError,
+    )
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            raise FakeRateLimitError(
+                "rate limit exceeded"
+            )
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="OpenAI rate limit exceeded",
+    ):
+        provider.implement(
+            "implementation prompt"
+        )
