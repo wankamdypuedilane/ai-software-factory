@@ -118,3 +118,53 @@ def test_rebuild_design_gate_rejects_missing_ux_ui_result() -> None:
         rebuild_design_gate_from_state(
             state,
         )
+
+
+def test_rebuild_design_gate_restores_existing_human_approval() -> None:
+    state = {
+        "approvals": {
+            "design": True,
+        },
+        "agents": {
+            "ux_ui": {
+                "status": "APPROVED",
+                "last_result": {
+                    "artifact_requests": [
+                        {
+                            "path": "design/ux-ui/user-flows.md",
+                            "purpose": "Document user flows.",
+                        },
+                        {
+                            "path": "design/ux-ui/screen-specs.md",
+                            "purpose": "Document screen specifications.",
+                        },
+                    ],
+                    "generated_artifacts": [
+                        "design/ux-ui/user-flows.md",
+                        "design/ux-ui/screen-specs.md",
+                    ],
+                    "blockers": [],
+                },
+            }
+        },
+        "design_gate": {
+            "status": "READY_FOR_REVIEW",
+            "groups": {},
+            "external_blockers": [],
+            "human_approval": False,
+        },
+    }
+
+    updated_state = rebuild_design_gate_from_state(
+        state,
+    )
+
+    gate = updated_state["design_gate"]
+
+    assert gate["status"] == "APPROVED"
+    assert gate["human_approval"] is True
+    assert gate["groups"]["deliverables"] == {
+        "approved": 2,
+        "total": 2,
+    }
+    assert gate["external_blockers"] == []

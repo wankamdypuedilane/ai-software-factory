@@ -120,15 +120,30 @@ def rebuild_design_gate_from_state(
 
     gate["external_blockers"] = list(blockers)
 
-    if (
+    deliverables_ready = (
         requested_total > 0
         and generated_total == requested_total
         and not blockers
-    ):
+    )
+
+    approvals = state.get(
+        "approvals",
+        {},
+    )
+
+    design_approved = (
+        isinstance(approvals, dict)
+        and approvals.get("design") is True
+    )
+
+    if deliverables_ready and design_approved:
+        gate["status"] = "APPROVED"
+        gate["human_approval"] = True
+    elif deliverables_ready:
         gate["status"] = "READY_FOR_REVIEW"
+        gate["human_approval"] = False
     else:
         gate["status"] = "PARTIAL"
-
-    gate["human_approval"] = False
+        gate["human_approval"] = False
 
     return state
