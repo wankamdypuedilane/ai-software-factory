@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from ai_factory.context_builder import build_agent_context
+from ai_factory.context_builder import (
+    build_agent_context,
+    load_upstream_generated_artifacts,
+)
 from ai_factory.state import save_state
 
 
@@ -266,3 +269,185 @@ def test_build_agent_context_returns_none_without_human_input(
     )
 
     assert context["human_input"] is None
+
+
+def test_load_upstream_generated_artifacts_loads_previous_agent_files(
+    tmp_path: Path,
+) -> None:
+    vision_path = (
+        tmp_path
+        / "knowledge"
+        / "project"
+        / "vision.md"
+    )
+
+    requirements_path = (
+        tmp_path
+        / "knowledge"
+        / "project"
+        / "requirements.md"
+    )
+
+    vision_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    vision_path.write_text(
+        "# Vision\n\nRide-hailing product.",
+        encoding="utf-8",
+    )
+
+    requirements_path.write_text(
+        "# Requirements\n\nMVP requirements.",
+        encoding="utf-8",
+    )
+
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+                "last_result": {
+                    "generated_artifacts": [
+                        "knowledge/project/vision.md",
+                        "knowledge/project/requirements.md",
+                    ]
+                },
+            },
+            "ux_ui": {
+                "status": "READY",
+            },
+        }
+    }
+
+    artifacts = load_upstream_generated_artifacts(
+        project_root=tmp_path,
+        state=state,
+        agent_name="ux_ui",
+    )
+
+    assert "knowledge/project/vision.md" in artifacts
+    assert "Ride-hailing product." in artifacts[
+        "knowledge/project/vision.md"
+    ]
+
+    assert "knowledge/project/requirements.md" in artifacts
+    assert "MVP requirements." in artifacts[
+        "knowledge/project/requirements.md"
+    ]
+
+
+def test_load_upstream_generated_artifacts_ignores_future_agents(
+    tmp_path: Path,
+) -> None:
+    future_path = (
+        tmp_path
+        / "knowledge"
+        / "architecture"
+        / "system.md"
+    )
+
+    future_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    future_path.write_text(
+        "# Architecture",
+        encoding="utf-8",
+    )
+
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+            },
+            "ux_ui": {
+                "status": "READY",
+            },
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+                "last_result": {
+                    "generated_artifacts": [
+                        "knowledge/architecture/system.md",
+                    ]
+                },
+            },
+        }
+    }
+
+    artifacts = load_upstream_generated_artifacts(
+        project_root=tmp_path,
+        state=state,
+        agent_name="ux_ui",
+    )
+
+    assert artifacts == {}
+
+
+def test_build_agent_context_includes_upstream_generated_artifacts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    vision_path = (
+        tmp_path
+        / "knowledge"
+        / "project"
+        / "vision.md"
+    )
+
+    vision_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    vision_path.write_text(
+        "# Product Vision\n\nRide-hailing MVP.",
+        encoding="utf-8",
+    )
+
+    save_state(
+        tmp_path / ".factory" / "state.yaml",
+        {
+            "agents": {
+                "product": {
+                    "status": "APPROVED",
+                    "last_result": {
+                        "generated_artifacts": [
+                            "knowledge/project/vision.md",
+                        ]
+                    },
+                },
+                "ux_ui": {
+                    "status": "READY",
+                },
+            }
+        },
+    )
+
+    save_state(
+        tmp_path / ".factory" / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "context": {
+                "agents": {
+                    "ux_ui": [],
+                }
+            },
+        },
+    )
+
+    context = build_agent_context(
+        project_root=tmp_path,
+        agent_name="ux_ui",
+    )
+
+    assert "knowledge/project/vision.md" in context["artifacts"]
+    assert (
+        "Ride-hailing MVP."
+        in context["artifacts"]["knowledge/project/vision.md"]
+    )
