@@ -2,6 +2,7 @@ from pathlib import Path
 
 from ai_factory.context_builder import (
     build_agent_context,
+    is_artifact_relevant_to_agent,
     load_upstream_generated_artifacts,
     trim_artifact_content,
 )
@@ -531,4 +532,123 @@ def test_upstream_artifacts_are_trimmed(
     assert (
         "[Artifact content truncated for execution context]"
         in content
+    )
+
+
+def test_artifact_relevance_for_architect() -> None:
+    assert is_artifact_relevant_to_agent(
+        "knowledge/project/requirements.md",
+        "architect",
+    )
+    assert is_artifact_relevant_to_agent(
+        "design/ux-ui/screen-specs.md",
+        "architect",
+    )
+    assert not is_artifact_relevant_to_agent(
+        "knowledge/architecture/api.md",
+        "architect",
+    )
+
+
+def test_artifact_relevance_for_qa() -> None:
+    assert is_artifact_relevant_to_agent(
+        "knowledge/project/requirements.md",
+        "qa",
+    )
+    assert is_artifact_relevant_to_agent(
+        "workflows/backlog/user-stories.md",
+        "qa",
+    )
+    assert is_artifact_relevant_to_agent(
+        "design/ux-ui/screen-specs.md",
+        "qa",
+    )
+    assert is_artifact_relevant_to_agent(
+        "knowledge/architecture/api.md",
+        "qa",
+    )
+
+    assert not is_artifact_relevant_to_agent(
+        "design/ux-ui/design-system.md",
+        "qa",
+    )
+
+
+def test_load_upstream_generated_artifacts_filters_irrelevant_files(
+    tmp_path: Path,
+) -> None:
+    requirements = (
+        tmp_path
+        / "knowledge"
+        / "project"
+        / "requirements.md"
+    )
+    design_system = (
+        tmp_path
+        / "design"
+        / "ux-ui"
+        / "design-system.md"
+    )
+
+    requirements.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    design_system.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    requirements.write_text(
+        "Requirements",
+        encoding="utf-8",
+    )
+    design_system.write_text(
+        "Design system",
+        encoding="utf-8",
+    )
+
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+                "last_result": {
+                    "generated_artifacts": [
+                        "knowledge/project/requirements.md",
+                    ],
+                },
+            },
+            "ux_ui": {
+                "status": "APPROVED",
+                "last_result": {
+                    "generated_artifacts": [
+                        "design/ux-ui/design-system.md",
+                    ],
+                },
+            },
+            "architect": {
+                "status": "APPROVED",
+            },
+            "developer": {
+                "status": "APPROVED",
+            },
+            "qa": {
+                "status": "READY",
+            },
+        }
+    }
+
+    artifacts = load_upstream_generated_artifacts(
+        project_root=tmp_path,
+        state=state,
+        agent_name="qa",
+    )
+
+    assert (
+        "knowledge/project/requirements.md"
+        in artifacts
+    )
+    assert (
+        "design/ux-ui/design-system.md"
+        not in artifacts
     )

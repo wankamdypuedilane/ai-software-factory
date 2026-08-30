@@ -8,6 +8,44 @@ from ai_factory.state import load_state
 
 MAX_ARTIFACT_CONTEXT_CHARS = 6000
 
+UPSTREAM_ARTIFACT_PREFIXES = {
+    "ux_ui": (
+        "knowledge/project/",
+        "workflows/backlog/",
+    ),
+    "architect": (
+        "knowledge/project/",
+        "workflows/backlog/",
+        "design/ux-ui/",
+    ),
+    "developer": (
+        "knowledge/project/",
+        "workflows/backlog/",
+        "design/ux-ui/",
+        "knowledge/architecture/",
+        "knowledge/decisions/",
+    ),
+    "qa": (
+        "knowledge/project/requirements.md",
+        "workflows/backlog/",
+        "design/ux-ui/screen-specs.md",
+        "knowledge/architecture/api.md",
+    ),
+    "security": (
+        "knowledge/project/requirements.md",
+        "knowledge/architecture/",
+        "knowledge/decisions/",
+    ),
+    "devops": (
+        "knowledge/architecture/",
+        "knowledge/decisions/",
+    ),
+    "sre": (
+        "knowledge/architecture/",
+        "knowledge/decisions/",
+    ),
+}
+
 
 def trim_artifact_content(
     content: str,
@@ -21,6 +59,25 @@ def trim_artifact_content(
     return (
         content[:max_chars].rstrip()
         + "\n\n[Artifact content truncated for execution context]"
+    )
+
+
+def is_artifact_relevant_to_agent(
+    relative_path: str,
+    agent_name: str,
+) -> bool:
+    """Return whether an upstream artifact is relevant to an agent."""
+
+    prefixes = UPSTREAM_ARTIFACT_PREFIXES.get(
+        agent_name
+    )
+
+    if prefixes is None:
+        return True
+
+    return any(
+        relative_path.startswith(prefix)
+        for prefix in prefixes
     )
 
 
@@ -143,6 +200,12 @@ def load_upstream_generated_artifacts(
             continue
 
         for relative_path in generated_paths:
+            if not is_artifact_relevant_to_agent(
+                relative_path,
+                agent_name,
+            ):
+                continue
+
             artifact_path = (
                 project_root
                 / relative_path
