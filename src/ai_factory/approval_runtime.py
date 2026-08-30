@@ -11,6 +11,7 @@ APPROVAL_AGENT_MAP = {
     "design": "ux_ui",
     "architecture": "architect",
     "development": "developer",
+    "qa": "qa",
 }
 
 
@@ -67,6 +68,28 @@ def apply_approval(
                 "the Development Gate is not ready for human approval."
             )
 
+    if approval_name == "qa":
+        qa_gate = state.get(
+            "qa_gate"
+        )
+
+        if not isinstance(
+            qa_gate,
+            dict,
+        ):
+            raise ValueError(
+                "Project state does not contain a valid qa_gate."
+            )
+
+        if (
+            qa_gate.get("status")
+            != "READY_FOR_REVIEW"
+        ):
+            raise ValueError(
+                "QA cannot be approved: "
+                "the QA Gate is not ready for human approval."
+            )
+
     state = set_agent_status(
         state,
         agent_name,
@@ -78,6 +101,19 @@ def apply_approval(
         state,
         approval_name,
     )
+
+    if approval_name == "qa":
+        qa_gate = state[
+            "qa_gate"
+        ]
+
+        qa_gate[
+            "human_approval"
+        ] = True
+
+        qa_gate[
+            "status"
+        ] = "APPROVED"
 
     if approval_name == "development":
         development_gate = state[
