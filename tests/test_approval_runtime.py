@@ -155,6 +155,10 @@ def test_apply_architecture_approval_requires_approved_technology_gate(
             project_root=tmp_path,
         )
 
+    assert state["approvals"]["architecture"] is False
+    assert state["agents"]["architect"]["status"] == "REVIEW_REQUIRED"
+    assert state["agents"]["developer"]["status"] == "NOT_STARTED"
+
 
 def test_apply_architecture_approval_activates_developer(
     tmp_path: Path,
