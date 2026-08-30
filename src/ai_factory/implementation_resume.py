@@ -28,6 +28,10 @@ def get_completed_implementation_task_ids(
     if not isinstance(last_result, dict):
         return set()
 
+    failed_task_id = last_result.get(
+        "failed_task_id"
+    )
+
     results = last_result.get(
         "implementation_results",
         [],
@@ -53,6 +57,7 @@ def get_completed_implementation_task_ids(
             and task_id.strip()
             and isinstance(blockers, list)
             and not blockers
+            and task_id != failed_task_id
         ):
             completed.add(
                 task_id

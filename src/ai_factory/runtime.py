@@ -15,6 +15,9 @@ from ai_factory.implementation_history import (
 from ai_factory.implementation_resume import (
     get_completed_implementation_task_ids,
 )
+from ai_factory.implementation_retry import (
+    build_implementation_retry_context,
+)
 from ai_factory.orchestrator import (
     get_execution_blocker,
     get_next_agent,
@@ -38,6 +41,51 @@ def run_next_agent(
 
     state_path = project_root / ".factory" / "state.yaml"
     state = load_state(state_path)
+
+    developer_retry_context = None
+
+    developer_state = state.get(
+        "agents",
+        {},
+    ).get(
+        "developer",
+    )
+
+    if isinstance(developer_state, dict):
+        developer_last_result = developer_state.get(
+            "last_result",
+            {},
+        )
+
+        if isinstance(developer_last_result, dict):
+            failed_task_id = developer_last_result.get(
+                "failed_task_id"
+            )
+
+            test_results = developer_last_result.get(
+                "test_results",
+                [],
+            )
+
+            has_failed_tests = (
+                isinstance(test_results, list)
+                and any(
+                    isinstance(item, dict)
+                    and item.get("passed") is False
+                    for item in test_results
+                )
+            )
+
+            if (
+                isinstance(failed_task_id, str)
+                and failed_task_id.strip()
+                and has_failed_tests
+            ):
+                developer_retry_context = (
+                    build_implementation_retry_context(
+                        state
+                    )
+                )
 
     agent_name = get_next_agent(state)
 
@@ -75,6 +123,17 @@ def run_next_agent(
             )
         )
 
+        retry_task_id = None
+        retry_test_results = None
+
+        if developer_retry_context is not None:
+            retry_task_id = (
+                developer_retry_context.task.id
+            )
+            retry_test_results = (
+                developer_retry_context.test_results
+            )
+
         implementation_batch = run_implementation_batch(
             project_root=project_root,
             agent_name=agent_name,
@@ -82,6 +141,8 @@ def run_next_agent(
             context=context,
             provider=provider,
             completed_task_ids=completed_task_ids,
+            retry_task_id=retry_task_id,
+            retry_test_results=retry_test_results,
         )
 
     generated_artifacts = run_artifact_generation(

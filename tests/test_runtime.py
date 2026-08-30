@@ -1166,3 +1166,173 @@ def test_run_next_agent_marks_developer_failed_when_tests_fail(
     assert len(
         last_result["implementation_results"]
     ) == 1
+
+
+def test_run_next_agent_uses_retry_context_for_failed_developer(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {
+                    "status": "READY",
+                    "last_result": {
+                        "failed_task_id": "US-002",
+                        "implementation_requests": [
+                            {
+                                "id": "US-001",
+                                "title": "Authentication",
+                                "purpose": "Implement authentication.",
+                            },
+                            {
+                                "id": "US-002",
+                                "title": "Ride creation",
+                                "purpose": "Implement ride creation.",
+                            },
+                            {
+                                "id": "US-003",
+                                "title": "Ride completion",
+                                "purpose": "Implement ride completion.",
+                            },
+                        ],
+                        "implementation_results": [
+                            {
+                                "task_id": "US-001",
+                                "summary": "Authentication implemented.",
+                                "tests": [],
+                                "blockers": [],
+                                "files": [
+                                    "src/auth.py",
+                                ],
+                            },
+                            {
+                                "task_id": "US-002",
+                                "summary": "Ride creation failed.",
+                                "tests": [
+                                    "python -m pytest tests/test_rides.py -q",
+                                ],
+                                "blockers": [],
+                                "files": [
+                                    "src/rides.py",
+                                ],
+                            },
+                        ],
+                        "implemented_files": [
+                            "src/auth.py",
+                            "src/rides.py",
+                        ],
+                        "test_results": [
+                            {
+                                "command": (
+                                    "python -m pytest "
+                                    "tests/test_rides.py -q"
+                                ),
+                                "returncode": 1,
+                                "passed": False,
+                                "stdout": "1 failed",
+                                "stderr": "AssertionError",
+                            }
+                        ],
+                    },
+                },
+                "qa": {"status": "NOT_STARTED"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "developer": [],
+                }
+            },
+        },
+    )
+
+    class RetryRuntimeProvider(DevelopmentModelProvider):
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Implementation replanned.",
+                implementation_requests=[
+                    AgentImplementationRequest(
+                        id="US-001",
+                        title="Authentication",
+                        purpose="Implement authentication.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-002",
+                        title="Ride creation",
+                        purpose="Implement ride creation.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-003",
+                        title="Ride completion",
+                        purpose="Implement ride completion.",
+                    ),
+                ],
+                handoff="qa",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            self.prompts.append(prompt)
+
+            if len(self.prompts) == 1:
+                return ImplementationResult(
+                    task_id="US-002",
+                    summary="Ride creation fixed.",
+                )
+
+            return ImplementationResult(
+                task_id="US-003",
+                summary="Ride completion implemented.",
+            )
+
+    provider = RetryRuntimeProvider()
+
+    agent_name, _ = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "developer"
+    assert len(provider.prompts) == 2
+
+    assert "Task ID: US-001" not in provider.prompts[0]
+
+    assert "Task ID: US-002" in provider.prompts[0]
+    assert "## Previous Test Failures" in provider.prompts[0]
+    assert "AssertionError" in provider.prompts[0]
+
+    assert "Task ID: US-003" in provider.prompts[1]
+    assert "## Previous Test Failures" not in provider.prompts[1]
