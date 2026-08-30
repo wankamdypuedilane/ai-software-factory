@@ -294,6 +294,15 @@ def run_next_agent(
             )
         )
 
+        if qa_result.blockers:
+            qa_state["status"] = "BLOCKED"
+
+        elif not qa_execution.passed:
+            qa_state["status"] = "FAILED"
+
+        else:
+            qa_state["status"] = "REVIEW_REQUIRED"
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 

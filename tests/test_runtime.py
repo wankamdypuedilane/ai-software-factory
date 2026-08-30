@@ -498,6 +498,172 @@ def test_run_next_agent_persists_qa_execution(
         is True
     )
 
+    assert updated_state["agents"]["qa"]["status"] == "FAILED"
+
+
+def test_run_next_agent_marks_qa_blocked_when_qa_has_blockers(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "READY"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "qa": [],
+                }
+            },
+        },
+    )
+
+    class BlockingQAProvider(DevelopmentModelProvider):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="QA orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            return QAResult(
+                summary="QA blocked.",
+                passed=True,
+                blockers=[
+                    "Required test environment is unavailable.",
+                ],
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=BlockingQAProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert updated_state["agents"]["qa"]["status"] == "BLOCKED"
+
+
+def test_run_next_agent_marks_qa_review_required_when_validation_passes(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "READY"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "qa": [],
+                }
+            },
+        },
+    )
+
+    class PassingQAProvider(DevelopmentModelProvider):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="QA orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            return QAResult(
+                summary="QA passed.",
+                passed=True,
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=PassingQAProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["qa"]["status"]
+        == "REVIEW_REQUIRED"
+    )
+
 
 def test_run_next_agent_rejects_when_no_agent_is_ready(
     tmp_path: Path,
