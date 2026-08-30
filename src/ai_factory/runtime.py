@@ -22,6 +22,9 @@ from ai_factory.orchestrator import (
 from ai_factory.providers import ModelProvider
 from ai_factory.result_application import apply_agent_result
 from ai_factory.state import load_state, save_state
+from ai_factory.test_result_serialization import (
+    serialize_test_results,
+)
 from ai_factory.technology_runtime import (
     update_technology_gate_from_architect_result,
 )
@@ -184,6 +187,12 @@ def run_next_agent(
 
         developer_result["failed_task_id"] = (
             implementation_batch.failed_task_id
+        )
+
+        developer_result["test_results"] = (
+            serialize_test_results(
+                implementation_batch.test_results
+            )
         )
 
         developer_result["implementation_blockers"] = [

@@ -715,6 +715,11 @@ def test_run_next_agent_executes_developer_implementation_batch(
     )
     assert last_result["implementation_blockers"] == []
     assert last_result["resume_from"] is None
+    assert len(last_result["test_results"]) == 2
+    assert all(
+        item["passed"]
+        for item in last_result["test_results"]
+    )
 
     assert (
         tmp_path / "src" / "auth.py"
@@ -1143,6 +1148,19 @@ def test_run_next_agent_marks_developer_failed_when_tests_fail(
 
     assert last_result["implementation_test_failed"] is True
     assert last_result["failed_task_id"] == "US-001"
+    assert len(last_result["test_results"]) == 1
+
+    test_result = last_result["test_results"][0]
+
+    assert (
+        test_result["command"]
+        == "python -m pytest tests/test_auth.py -q"
+    )
+
+    assert test_result["returncode"] != 0
+    assert test_result["passed"] is False
+    assert isinstance(test_result["stdout"], str)
+    assert isinstance(test_result["stderr"], str)
     assert last_result["implementation_blocked"] is False
 
     assert len(
