@@ -107,3 +107,35 @@ def test_build_agent_prompt_omits_human_input_when_missing() -> None:
     prompt = build_agent_prompt(context)
 
     assert "## Human Input" not in prompt
+
+
+def test_build_agent_prompt_includes_developer_specific_instruction() -> None:
+    context = {
+        "agent_name": "developer",
+        "contract": "Developer contract",
+        "project": {},
+        "state": {},
+        "artifacts": {},
+        "human_input": None,
+    }
+
+    prompt = build_agent_prompt(context)
+
+    assert "## Agent-Specific Instruction" in prompt
+    assert "implementation_requests" in prompt
+    assert "Do not generate the entire application implementation" in prompt
+
+
+def test_build_agent_prompt_omits_agent_specific_instruction_for_other_agents() -> None:
+    context = {
+        "agent_name": "qa",
+        "contract": "QA contract",
+        "project": {},
+        "state": {},
+        "artifacts": {},
+        "human_input": None,
+    }
+
+    prompt = build_agent_prompt(context)
+
+    assert "## Agent-Specific Instruction" not in prompt

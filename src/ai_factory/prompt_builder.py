@@ -2,6 +2,26 @@ import json
 from typing import Any
 
 
+def get_agent_specific_instruction(
+    agent_name: str,
+) -> str | None:
+    """Return additional execution guidance for a specific agent."""
+
+    if agent_name == "developer":
+        return (
+            "Do not generate the entire application implementation in this "
+            "agent result. Instead, produce concise implementation_requests "
+            "that break the approved work into small, independently "
+            "implementable units. Base those requests on approved User "
+            "Stories, acceptance criteria, UX/UI specifications, architecture, "
+            "and selected technologies. Each implementation request must have "
+            "a stable id, a concise title, and a clear purpose. "
+            "Do not invent features outside the approved scope."
+        )
+
+    return None
+
+
 def build_agent_prompt(
     context: dict[str, Any],
 ) -> str:
@@ -60,6 +80,19 @@ def build_agent_prompt(
                 "",
                 "## Human Input",
                 human_input.strip(),
+            ]
+        )
+
+    agent_specific_instruction = get_agent_specific_instruction(
+        agent_name
+    )
+
+    if agent_specific_instruction:
+        sections.extend(
+            [
+                "",
+                "## Agent-Specific Instruction",
+                agent_specific_instruction,
             ]
         )
 
