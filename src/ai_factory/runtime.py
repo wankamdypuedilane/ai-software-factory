@@ -13,6 +13,9 @@ from ai_factory.orchestrator import (
 from ai_factory.providers import ModelProvider
 from ai_factory.result_application import apply_agent_result
 from ai_factory.state import load_state, save_state
+from ai_factory.technology_runtime import (
+    update_technology_gate_from_architect_result,
+)
 
 
 def run_next_agent(
@@ -49,6 +52,7 @@ def run_next_agent(
         project_root=project_root,
         agent_name=agent_name,
     )
+    config = context["project"]
 
     generated_artifacts = run_artifact_generation(
         project_root=project_root,
@@ -79,6 +83,13 @@ def run_next_agent(
             state=state,
             result=result,
             generated_paths=generated_paths,
+        )
+
+    if agent_name == "architect":
+        state = update_technology_gate_from_architect_result(
+            state=state,
+            config=config,
+            result=result,
         )
 
     save_state(

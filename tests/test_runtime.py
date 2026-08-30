@@ -382,3 +382,142 @@ def test_run_next_agent_updates_design_gate_for_ux_ui(
     }
     assert gate["external_blockers"] == []
     assert gate["human_approval"] is False
+
+
+def test_run_next_agent_updates_technology_gate_for_architect(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {
+                    "status": "APPROVED",
+                },
+                "ux_ui": {
+                    "status": "APPROVED",
+                },
+                "architect": {
+                    "status": "READY",
+                },
+                "developer": {
+                    "status": "NOT_STARTED",
+                },
+                "qa": {
+                    "status": "NOT_STARTED",
+                },
+                "security": {
+                    "status": "NOT_STARTED",
+                },
+                "devops": {
+                    "status": "NOT_STARTED",
+                },
+                "sre": {
+                    "status": "NOT_STARTED",
+                },
+            },
+            "technology_gate": {
+                "status": "NOT_STARTED",
+                "human_approval": False,
+                "proposal": {},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "recommend",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "architect": [],
+                }
+            },
+        },
+    )
+
+    class ArchitectRuntimeProvider(ModelProvider):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Architecture completed.",
+                metadata={
+                    "technology_proposal": {
+                        "components": [
+                            {
+                                "name": "frontend",
+                                "technology": "React",
+                                "rationale": "Suitable for the web UI.",
+                            },
+                            {
+                                "name": "backend",
+                                "technology": "Django",
+                                "rationale": "Suitable for the monolith.",
+                            },
+                            {
+                                "name": "database",
+                                "technology": "PostgreSQL",
+                                "rationale": "Relational persistence.",
+                            },
+                        ]
+                    }
+                },
+                handoff="developer",
+            )
+
+        def generate(self, prompt: str) -> str:
+            return "# Generated Architecture Artifact"
+
+    provider = ArchitectRuntimeProvider()
+
+    agent_name, result = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "architect"
+    assert result.status == "COMPLETED"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["architect"]["status"]
+        == "REVIEW_REQUIRED"
+    )
+
+    gate = updated_state["technology_gate"]
+
+    assert gate["status"] == "REVIEW_REQUIRED"
+    assert gate["human_approval"] is False
+    assert gate["proposal"] == {
+        "components": {
+            "frontend": {
+                "technology": "React",
+                "rationale": "Suitable for the web UI.",
+            },
+            "backend": {
+                "technology": "Django",
+                "rationale": "Suitable for the monolith.",
+            },
+            "database": {
+                "technology": "PostgreSQL",
+                "rationale": "Relational persistence.",
+            },
+        }
+    }
