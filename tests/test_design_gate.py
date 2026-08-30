@@ -72,3 +72,16 @@ def test_design_gate_ready_when_all_designs_are_complete() -> None:
     }
 
     assert is_design_gate_ready(state) is True
+
+
+def test_design_gate_not_ready_when_no_groups_are_configured() -> None:
+    state = {
+        "design_gate": {
+            "status": "NOT_STARTED",
+            "groups": {},
+            "external_blockers": [],
+            "human_approval": False,
+        }
+    }
+
+    assert is_design_gate_ready(state) is False

@@ -26,6 +26,9 @@ def is_design_gate_ready(state: dict[str, Any]) -> bool:
             "Design gate groups must be a mapping."
         )
 
+    if not groups:
+        return False
+
     external_blockers = gate.get("external_blockers", [])
 
     if not isinstance(external_blockers, list):
