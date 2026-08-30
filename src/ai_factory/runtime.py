@@ -187,6 +187,13 @@ def run_next_agent(
             if item.blockers
         ]
 
+        developer_result["resume_from"] = None
+
+        for item in implementation_batch.results:
+            if item.blockers:
+                developer_result["resume_from"] = item.task_id
+                break
+
         if implementation_batch.blocked:
             state["agents"][agent_name]["status"] = "BLOCKED"
 
