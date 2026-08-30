@@ -569,6 +569,11 @@ def test_run_next_agent_executes_developer_implementation_batch(
                     "status": "NOT_STARTED",
                 },
             },
+            "development_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -682,6 +687,20 @@ def test_run_next_agent_executes_developer_implementation_batch(
 
     updated_state = load_state(
         factory_dir / "state.yaml"
+    )
+
+    development_gate = updated_state[
+        "development_gate"
+    ]
+
+    assert (
+        development_gate["status"]
+        == "READY_FOR_REVIEW"
+    )
+    assert development_gate["reasons"] == []
+    assert (
+        development_gate["human_approval"]
+        is False
     )
 
     developer = updated_state["agents"]["developer"]
@@ -1061,6 +1080,11 @@ def test_run_next_agent_marks_developer_failed_when_tests_fail(
                 "devops": {"status": "NOT_STARTED"},
                 "sre": {"status": "NOT_STARTED"},
             },
+            "development_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -1138,6 +1162,19 @@ def test_run_next_agent_marks_developer_failed_when_tests_fail(
 
     updated_state = load_state(
         factory_dir / "state.yaml"
+    )
+
+    development_gate = updated_state[
+        "development_gate"
+    ]
+
+    assert development_gate["status"] == "NOT_READY"
+    assert development_gate["reasons"] == [
+        "Developer implementation tests failed."
+    ]
+    assert (
+        development_gate["human_approval"]
+        is False
     )
 
     developer = updated_state["agents"]["developer"]

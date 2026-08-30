@@ -6,6 +6,9 @@ from ai_factory.context_builder import build_agent_context
 from ai_factory.design_gate_runtime import (
     update_design_gate_from_result,
 )
+from ai_factory.development_gate_runtime import (
+    update_development_gate_from_state,
+)
 from ai_factory.implementation_batch import (
     run_implementation_batch,
 )
@@ -284,6 +287,17 @@ def run_next_agent(
 
         elif implementation_batch.test_failed:
             state["agents"][agent_name]["status"] = "FAILED"
+
+        if (
+            agent_name == "developer"
+            and isinstance(
+                state.get("development_gate"),
+                dict,
+            )
+        ):
+            state = update_development_gate_from_state(
+                state
+            )
 
     if generated_paths:
         state["agents"][agent_name]["last_result"][
