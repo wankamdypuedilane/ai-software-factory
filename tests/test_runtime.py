@@ -291,6 +291,11 @@ def test_run_next_agent_requires_qa_capable_provider(
                 "devops": {"status": "NOT_STARTED"},
                 "sre": {"status": "NOT_STARTED"},
             },
+            "qa_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -387,6 +392,11 @@ def test_run_next_agent_persists_qa_execution(
                 "security": {"status": "NOT_STARTED"},
                 "devops": {"status": "NOT_STARTED"},
                 "sre": {"status": "NOT_STARTED"},
+            },
+            "qa_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
             },
         },
     )
@@ -500,6 +510,12 @@ def test_run_next_agent_persists_qa_execution(
 
     assert updated_state["agents"]["qa"]["status"] == "FAILED"
 
+    qa_gate = updated_state["qa_gate"]
+
+    assert qa_gate["status"] == "NOT_READY"
+    assert "QA validation did not pass." in qa_gate["reasons"]
+    assert qa_gate["human_approval"] is False
+
 
 def test_run_next_agent_marks_qa_blocked_when_qa_has_blockers(
     tmp_path: Path,
@@ -519,6 +535,11 @@ def test_run_next_agent_marks_qa_blocked_when_qa_has_blockers(
                 "security": {"status": "NOT_STARTED"},
                 "devops": {"status": "NOT_STARTED"},
                 "sre": {"status": "NOT_STARTED"},
+            },
+            "qa_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
             },
         },
     )
@@ -602,6 +623,11 @@ def test_run_next_agent_marks_qa_review_required_when_validation_passes(
                 "devops": {"status": "NOT_STARTED"},
                 "sre": {"status": "NOT_STARTED"},
             },
+            "qa_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -663,6 +689,12 @@ def test_run_next_agent_marks_qa_review_required_when_validation_passes(
         updated_state["agents"]["qa"]["status"]
         == "REVIEW_REQUIRED"
     )
+
+    qa_gate = updated_state["qa_gate"]
+
+    assert qa_gate["status"] == "READY_FOR_REVIEW"
+    assert qa_gate["reasons"] == []
+    assert qa_gate["human_approval"] is False
 
 
 def test_run_next_agent_rejects_when_no_agent_is_ready(

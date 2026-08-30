@@ -29,6 +29,9 @@ from ai_factory.providers import (
     ModelProvider,
     QAProvider,
 )
+from ai_factory.qa_gate_runtime import (
+    update_qa_gate_from_state,
+)
 from ai_factory.result_application import apply_agent_result
 from ai_factory.qa_runtime import run_qa_validation
 from ai_factory.state import load_state, save_state
@@ -302,6 +305,14 @@ def run_next_agent(
 
         else:
             qa_state["status"] = "REVIEW_REQUIRED"
+
+        if isinstance(
+            state.get("qa_gate"),
+            dict,
+        ):
+            state = update_qa_gate_from_state(
+                state
+            )
 
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
