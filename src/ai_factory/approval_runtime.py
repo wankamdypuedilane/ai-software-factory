@@ -23,6 +23,17 @@ def apply_approval(
         approval_name,
     )
 
+    if approval_name == "design":
+        design_gate = state.get("design_gate")
+
+        if not isinstance(design_gate, dict):
+            raise ValueError(
+                "Project state does not contain a valid design_gate."
+            )
+
+        design_gate["human_approval"] = True
+        design_gate["status"] = "APPROVED"
+
     agent_name = APPROVAL_AGENT_MAP.get(
         approval_name,
     )

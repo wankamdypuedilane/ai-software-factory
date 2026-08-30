@@ -68,6 +68,8 @@ def test_apply_design_approval_approves_ux_ui() -> None:
     assert updated_state["approvals"]["design"] is True
     assert updated_state["agents"]["ux_ui"]["status"] == "APPROVED"
     assert updated_state["agents"]["architect"]["status"] == "READY"
+    assert updated_state["design_gate"]["status"] == "APPROVED"
+    assert updated_state["design_gate"]["human_approval"] is True
 
 
 def test_apply_approval_rejects_agent_not_waiting_for_review() -> None:
