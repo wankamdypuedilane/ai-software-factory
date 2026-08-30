@@ -4,6 +4,12 @@ import pytest
 
 from ai_factory.approval_runtime import apply_approval
 from ai_factory.state import save_state
+from ai_factory.technology_gate import (
+    approve_technology_gate,
+)
+from ai_factory.technology_selection import (
+    apply_approved_technology_to_config,
+)
 
 
 def test_apply_product_scope_approval_approves_product() -> None:
@@ -230,3 +236,99 @@ def test_apply_architecture_approval_activates_developer(
 
     assert updated_state["agents"]["architect"]["status"] == "APPROVED"
     assert updated_state["agents"]["developer"]["status"] == "READY"
+
+
+def test_technology_then_architecture_approval_flow(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    config = {
+        "technology": {
+            "selection_mode": "recommend",
+            "constraints": {},
+            "selected": {},
+        }
+    }
+
+    save_state(
+        factory_dir / "project.yaml",
+        config,
+    )
+
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "developer": {
+                "status": "NOT_STARTED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+            "security": {
+                "status": "NOT_STARTED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "technology_gate": {
+            "status": "REVIEW_REQUIRED",
+            "human_approval": False,
+            "proposal": {
+                "components": {
+                    "backend": {
+                        "technology": "Django",
+                        "rationale": "Monolithic web backend.",
+                    },
+                    "database": {
+                        "technology": "PostgreSQL",
+                        "rationale": "Relational persistence.",
+                    },
+                }
+            },
+        },
+    }
+
+    state = approve_technology_gate(
+        state
+    )
+
+    config = apply_approved_technology_to_config(
+        config=config,
+        state=state,
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        config,
+    )
+
+    assert state["technology_gate"]["status"] == "APPROVED"
+    assert state["technology_gate"]["human_approval"] is True
+
+    assert config["technology"]["selected"]["backend"] == {
+        "technology": "Django",
+        "rationale": "Monolithic web backend.",
+    }
+
+    state = apply_approval(
+        state,
+        "architecture",
+        project_root=tmp_path,
+    )
+
+    assert state["approvals"]["architecture"] is True
+    assert state["agents"]["architect"]["status"] == "APPROVED"
+    assert state["agents"]["developer"]["status"] == "READY"
