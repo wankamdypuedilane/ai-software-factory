@@ -183,6 +183,77 @@ def test_run_implementation_batch_handles_no_requests(
     assert provider.prompts == []
 
 
+def test_run_implementation_batch_stops_when_tests_fail(
+    tmp_path: Path,
+) -> None:
+    agent_result = AgentResult(
+        status="COMPLETED",
+        summary="Implementation planned.",
+        implementation_requests=[
+            AgentImplementationRequest(
+                id="US-001",
+                title="Authentication",
+                purpose="Implement authentication.",
+            ),
+            AgentImplementationRequest(
+                id="US-002",
+                title="Ride creation",
+                purpose="Implement ride creation.",
+            ),
+        ],
+    )
+
+    class FailingTestProvider:
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            self.prompts.append(prompt)
+
+            if len(self.prompts) == 1:
+                return ImplementationResult(
+                    task_id="US-001",
+                    summary="Authentication implemented.",
+                    files=[
+                        ImplementationFileChange(
+                            path="tests/test_auth.py",
+                            content=(
+                                "def test_auth():\n"
+                                "    assert False\n"
+                            ),
+                        )
+                    ],
+                    tests=[
+                        "python -m pytest tests/test_auth.py -q",
+                    ],
+                )
+
+            return ImplementationResult(
+                task_id="US-002",
+                summary="Should not execute.",
+            )
+
+    provider = FailingTestProvider()
+
+    batch = run_implementation_batch(
+        project_root=tmp_path,
+        agent_name="developer",
+        agent_result=agent_result,
+        context={},
+        provider=provider,
+    )
+
+    assert batch.test_failed is True
+    assert batch.failed_task_id == "US-001"
+    assert batch.blocked is False
+
+    assert len(batch.results) == 1
+    assert len(provider.prompts) == 1
+
+
 def test_run_implementation_batch_skips_completed_tasks(
     tmp_path: Path,
 ) -> None:

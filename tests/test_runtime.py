@@ -635,10 +635,17 @@ def test_run_next_agent_executes_developer_implementation_batch(
                         ImplementationFileChange(
                             path="src/auth.py",
                             content="# auth",
-                        )
+                        ),
+                        ImplementationFileChange(
+                            path="tests/test_auth.py",
+                            content=(
+                                "def test_auth():\n"
+                                "    assert True\n"
+                            ),
+                        ),
                     ],
                     tests=[
-                        "pytest tests/test_auth.py",
+                        "python -m pytest tests/test_auth.py -q",
                     ],
                 )
 
@@ -649,10 +656,17 @@ def test_run_next_agent_executes_developer_implementation_batch(
                     ImplementationFileChange(
                         path="src/rides.py",
                         content="# rides",
-                    )
+                    ),
+                    ImplementationFileChange(
+                        path="tests/test_rides.py",
+                        content=(
+                            "def test_rides():\n"
+                            "    assert True\n"
+                        ),
+                    ),
                 ],
                 tests=[
-                    "pytest tests/test_rides.py",
+                    "python -m pytest tests/test_rides.py -q",
                 ],
             )
 
@@ -690,7 +704,9 @@ def test_run_next_agent_executes_developer_implementation_batch(
 
     assert last_result["implemented_files"] == [
         "src/auth.py",
+        "tests/test_auth.py",
         "src/rides.py",
+        "tests/test_rides.py",
     ]
 
     assert (

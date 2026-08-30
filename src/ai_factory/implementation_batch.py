@@ -29,6 +29,8 @@ class ImplementationBatchResult:
         default_factory=list
     )
     blocked: bool = False
+    test_failed: bool = False
+    failed_task_id: str | None = None
 
 
 def run_implementation_batch(
@@ -76,6 +78,11 @@ def run_implementation_batch(
         batch.written_files.extend(
             execution.written_files
         )
+
+        if not execution.tests_passed:
+            batch.test_failed = True
+            batch.failed_task_id = result.task_id
+            break
 
         if result.blockers:
             batch.blocked = True
