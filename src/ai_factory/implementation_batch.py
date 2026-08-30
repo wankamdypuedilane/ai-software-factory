@@ -46,6 +46,8 @@ def run_implementation_batch(
     context: dict[str, Any],
     provider: ImplementationProvider,
     completed_task_ids: set[str] | None = None,
+    retry_task_id: str | None = None,
+    retry_test_results: list[dict[str, Any]] | None = None,
 ) -> ImplementationBatchResult:
     """Execute pending implementation requests sequentially."""
 
@@ -68,11 +70,20 @@ def run_implementation_batch(
     batch = ImplementationBatchResult()
 
     for task in tasks:
+        task_retry_results = None
+
+        if (
+            retry_task_id is not None
+            and task.id == retry_task_id
+        ):
+            task_retry_results = retry_test_results
+
         execution = run_implementation_task(
             project_root=project_root,
             task=task,
             context=context,
             provider=provider,
+            retry_test_results=task_retry_results,
         )
 
         result = execution.result

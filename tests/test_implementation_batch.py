@@ -266,6 +266,83 @@ def test_run_implementation_batch_stops_when_tests_fail(
     assert len(provider.prompts) == 1
 
 
+def test_run_implementation_batch_passes_retry_diagnostics_only_to_failed_task(
+    tmp_path: Path,
+) -> None:
+    agent_result = AgentResult(
+        status="COMPLETED",
+        summary="Implementation planned.",
+        implementation_requests=[
+            AgentImplementationRequest(
+                id="US-001",
+                title="Authentication",
+                purpose="Implement authentication.",
+            ),
+            AgentImplementationRequest(
+                id="US-002",
+                title="Ride creation",
+                purpose="Implement ride creation.",
+            ),
+            AgentImplementationRequest(
+                id="US-003",
+                title="Ride completion",
+                purpose="Implement ride completion.",
+            ),
+        ],
+    )
+
+    provider = FakeImplementationProvider(
+        [
+            ImplementationResult(
+                task_id="US-002",
+                summary="Ride creation fixed.",
+            ),
+            ImplementationResult(
+                task_id="US-003",
+                summary="Ride completion implemented.",
+            ),
+        ]
+    )
+
+    batch = run_implementation_batch(
+        project_root=tmp_path,
+        agent_name="developer",
+        agent_result=agent_result,
+        context={},
+        provider=provider,
+        completed_task_ids={
+            "US-001",
+        },
+        retry_task_id="US-002",
+        retry_test_results=[
+            {
+                "command": (
+                    "python -m pytest "
+                    "tests/test_rides.py -q"
+                ),
+                "returncode": 1,
+                "passed": False,
+                "stdout": "1 failed",
+                "stderr": "AssertionError",
+            }
+        ],
+    )
+
+    assert len(batch.results) == 2
+
+    assert len(provider.prompts) == 2
+
+    first_prompt = provider.prompts[0]
+    second_prompt = provider.prompts[1]
+
+    assert "Task ID: US-002" in first_prompt
+    assert "## Previous Test Failures" in first_prompt
+    assert "AssertionError" in first_prompt
+
+    assert "Task ID: US-003" in second_prompt
+    assert "## Previous Test Failures" not in second_prompt
+
+
 def test_run_implementation_batch_skips_completed_tasks(
     tmp_path: Path,
 ) -> None:
