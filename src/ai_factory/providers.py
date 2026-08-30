@@ -6,6 +6,9 @@ from ai_factory.implementation_provider import (
     ImplementationProvider,
 )
 from ai_factory.qa_result import QAResult
+from ai_factory.security_result import (
+    SecurityResult,
+)
 
 
 class ModelProvider(ABC):
@@ -30,10 +33,21 @@ class QAProvider:
         raise NotImplementedError
 
 
+class SecurityProvider:
+    """Provider capable of performing structured security validation."""
+
+    def validate_security(
+        self,
+        prompt: str,
+    ) -> SecurityResult:
+        raise NotImplementedError
+
+
 class DevelopmentModelProvider(
     ModelProvider,
     ImplementationProvider,
     QAProvider,
+    SecurityProvider,
 ):
     """Provider capable of agent and implementation execution."""
 
