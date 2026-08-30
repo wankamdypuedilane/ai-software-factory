@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ai_factory.agent_result import AgentResult
+from ai_factory.implementation_provider import (
+    ImplementationProvider,
+)
 
 
 class ModelProvider(ABC):
@@ -14,6 +17,15 @@ class ModelProvider(ABC):
     ) -> AgentResult:
         """Execute an agent using the supplied context."""
         raise NotImplementedError
+
+
+class DevelopmentModelProvider(
+    ModelProvider,
+    ImplementationProvider,
+):
+    """Provider capable of agent and implementation execution."""
+
+    pass
 
 
 class MockProvider(ModelProvider):

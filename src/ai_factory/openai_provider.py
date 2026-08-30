@@ -20,7 +20,7 @@ from ai_factory.implementation_result import (
     ImplementationResult,
 )
 from ai_factory.prompt_builder import build_agent_prompt
-from ai_factory.providers import ModelProvider
+from ai_factory.providers import DevelopmentModelProvider
 
 
 def build_implementation_result_schema() -> dict:
@@ -85,7 +85,7 @@ def build_implementation_result_schema() -> dict:
     }
 
 
-class OpenAIProvider(ModelProvider):
+class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 
     def __init__(
