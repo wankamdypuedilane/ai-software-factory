@@ -21,12 +21,14 @@ class FakeImplementationProvider:
     ) -> None:
         self.result = result
         self.prompt: str | None = None
+        self.prompts: list[str] = []
 
     def implement(
         self,
         prompt: str,
     ) -> ImplementationResult:
         self.prompt = prompt
+        self.prompts.append(prompt)
         return self.result
 
 
@@ -218,3 +220,57 @@ def test_run_implementation_task_executes_declared_tests(
     assert len(execution.test_results) == 1
     assert execution.test_results[0].passed is True
     assert execution.tests_passed is True
+
+
+def test_run_implementation_task_passes_retry_diagnostics_to_prompt(
+    tmp_path: Path,
+) -> None:
+    task = ImplementationTask(
+        agent_name="developer",
+        id="US-002",
+        title="Ride creation",
+        purpose="Implement ride creation.",
+    )
+
+    result = ImplementationResult(
+        task_id="US-002",
+        summary="Ride creation fixed.",
+    )
+
+    provider = FakeImplementationProvider(
+        result
+    )
+
+    execution = run_implementation_task(
+        project_root=tmp_path,
+        task=task,
+        context={},
+        provider=provider,
+        retry_test_results=[
+            {
+                "command": (
+                    "python -m pytest "
+                    "tests/test_rides.py -q"
+                ),
+                "returncode": 1,
+                "passed": False,
+                "stdout": "1 failed",
+                "stderr": "AssertionError",
+            }
+        ],
+    )
+
+    assert execution.result is result
+
+    assert len(provider.prompts) == 1
+
+    prompt = provider.prompts[0]
+
+    assert "## Previous Test Failures" in prompt
+    assert (
+        "python -m pytest tests/test_rides.py -q"
+        in prompt
+    )
+    assert "Return code: 1" in prompt
+    assert "1 failed" in prompt
+    assert "AssertionError" in prompt

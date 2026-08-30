@@ -46,12 +46,14 @@ def run_implementation_task(
     task: ImplementationTask,
     context: dict[str, Any],
     provider: ImplementationProvider,
+    retry_test_results: list[dict[str, Any]] | None = None,
 ) -> ImplementationExecution:
     """Execute and apply one focused implementation task."""
 
     prompt = build_implementation_prompt(
         task=task,
         context=context,
+        retry_test_results=retry_test_results,
     )
 
     result = provider.implement(
