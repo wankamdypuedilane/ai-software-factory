@@ -113,6 +113,9 @@ def run_next_agent(
             implementation_batch.blocked
         )
 
+        if implementation_batch.blocked:
+            state["agents"][agent_name]["status"] = "BLOCKED"
+
     if generated_paths:
         state["agents"][agent_name]["last_result"][
             "generated_artifacts"

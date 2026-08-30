@@ -705,3 +705,121 @@ def test_run_next_agent_executes_developer_implementation_batch(
     assert (
         tmp_path / "src" / "rides.py"
     ).exists()
+
+
+def test_run_next_agent_blocks_developer_when_implementation_batch_blocks(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "READY"},
+                "qa": {"status": "NOT_STARTED"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "developer": [],
+                }
+            },
+        },
+    )
+
+    class BlockingDeveloperProvider(DevelopmentModelProvider):
+        def __init__(self) -> None:
+            self.implementation_index = 0
+
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Implementation planned.",
+                implementation_requests=[
+                    AgentImplementationRequest(
+                        id="US-001",
+                        title="Authentication",
+                        purpose="Implement authentication.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-002",
+                        title="Ride creation",
+                        purpose="Implement ride creation.",
+                    ),
+                ],
+                handoff="qa",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            self.implementation_index += 1
+
+            if self.implementation_index == 1:
+                return ImplementationResult(
+                    task_id="US-001",
+                    summary="Implementation blocked.",
+                    blockers=[
+                        "Authentication requirement is ambiguous.",
+                    ],
+                )
+
+            return ImplementationResult(
+                task_id="US-002",
+                summary="Should not execute.",
+            )
+
+    provider = BlockingDeveloperProvider()
+
+    agent_name, result = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "developer"
+    assert result.status == "COMPLETED"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    developer = updated_state["agents"]["developer"]
+
+    assert developer["status"] == "BLOCKED"
+
+    last_result = developer["last_result"]
+
+    assert last_result["implementation_blocked"] is True
+    assert len(last_result["implementation_results"]) == 1
+    assert (
+        last_result["implementation_results"][0]["task_id"]
+        == "US-001"
+    )
+
+    assert provider.implementation_index == 1
