@@ -25,8 +25,12 @@ from ai_factory.orchestrator import (
     get_execution_blocker,
     get_next_agent,
 )
-from ai_factory.providers import ModelProvider
+from ai_factory.providers import (
+    ModelProvider,
+    QAProvider,
+)
 from ai_factory.result_application import apply_agent_result
+from ai_factory.qa_runtime import run_qa_validation
 from ai_factory.state import load_state, save_state
 from ai_factory.test_result_serialization import (
     serialize_test_results,
@@ -116,6 +120,51 @@ def run_next_agent(
         agent_name=agent_name,
     )
     config = context["project"]
+
+    qa_execution = None
+
+    if agent_name == "qa":
+        if not isinstance(
+            provider,
+            QAProvider,
+        ):
+            raise ValueError(
+                "QA execution requires a QA-capable provider."
+            )
+
+        developer_state = state.get(
+            "agents",
+            {},
+        ).get(
+            "developer",
+            {},
+        )
+
+        developer_result = {}
+
+        if isinstance(
+            developer_state,
+            dict,
+        ):
+            stored_result = developer_state.get(
+                "last_result",
+                {},
+            )
+
+            if isinstance(
+                stored_result,
+                dict,
+            ):
+                developer_result = stored_result
+
+        qa_context = dict(context)
+        qa_context["developer"] = developer_result
+
+        qa_execution = run_qa_validation(
+            project_root=project_root,
+            context=qa_context,
+            provider=provider,
+        )
 
     implementation_batch = None
 

@@ -15,9 +15,11 @@ from ai_factory.providers import (
     DevelopmentModelProvider,
     MockProvider,
     ModelProvider,
+    QAProvider,
 )
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
+from ai_factory.qa_result import QAResult
 
 
 class RuntimeTestProvider(ModelProvider):
@@ -42,6 +44,33 @@ class RuntimeTestProvider(ModelProvider):
         prompt: str,
     ) -> str:
         return "# System Architecture\n\nGenerated architecture."
+
+
+class QARuntimeProvider(ModelProvider, QAProvider):
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run(
+        self,
+        context,
+    ) -> AgentResult:
+        return AgentResult(
+            status="COMPLETED",
+            summary="QA agent completed.",
+        )
+
+    def validate_qa(
+        self,
+        prompt: str,
+    ) -> QAResult:
+        self.prompts.append(
+            prompt
+        )
+
+        return QAResult(
+            summary="QA validation completed.",
+            passed=True,
+        )
 
 
 def test_run_next_agent_executes_selected_agent(
@@ -140,6 +169,154 @@ def test_run_next_agent_executes_selected_agent(
         generated_file.read_text(encoding="utf-8")
         == "# System Architecture\n\nGenerated architecture."
     )
+
+
+def test_run_next_agent_executes_qa_validation(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {
+                    "status": "COMPLETED",
+                },
+                "ux_ui": {
+                    "status": "COMPLETED",
+                },
+                "architect": {
+                    "status": "COMPLETED",
+                },
+                "developer": {
+                    "status": "COMPLETED",
+                    "last_result": {
+                        "implemented_files": [
+                            "src/rides.py",
+                        ],
+                        "implementation_results": [
+                            {
+                                "task_id": "US-001",
+                                "summary": "Ride creation implemented.",
+                            }
+                        ],
+                    },
+                },
+                "qa": {
+                    "status": "READY",
+                },
+                "security": {
+                    "status": "NOT_STARTED",
+                },
+                "devops": {
+                    "status": "NOT_STARTED",
+                },
+                "sre": {
+                    "status": "NOT_STARTED",
+                },
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "context": {
+                "agents": {
+                    "qa": [],
+                }
+            },
+        },
+    )
+
+    provider = QARuntimeProvider()
+
+    agent_name, result = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "qa"
+    assert result.summary == "QA agent completed."
+    assert len(provider.prompts) == 1
+    assert "# QA Validation" in provider.prompts[0]
+    assert "src/rides.py" in provider.prompts[0]
+
+
+def test_run_next_agent_requires_qa_capable_provider(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "READY"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "qa": [],
+                }
+            },
+        },
+    )
+
+    class RunOnlyProvider(ModelProvider):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="QA orchestration completed.",
+            )
+
+    provider = RunOnlyProvider()
+
+    with pytest.raises(
+        ValueError,
+        match="QA-capable provider",
+    ):
+        run_next_agent(
+            project_root=tmp_path,
+            provider=provider,
+        )
 
 
 def test_run_next_agent_rejects_when_no_agent_is_ready(
