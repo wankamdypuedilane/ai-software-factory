@@ -19,7 +19,10 @@ from ai_factory.providers import (
 )
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
-from ai_factory.qa_result import QAResult
+from ai_factory.qa_result import (
+    QADefect,
+    QAResult,
+)
 
 
 class RuntimeTestProvider(ModelProvider):
@@ -251,6 +254,21 @@ def test_run_next_agent_executes_qa_validation(
     assert "# QA Validation" in provider.prompts[0]
     assert "src/rides.py" in provider.prompts[0]
 
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    qa_last_result = updated_state["agents"]["qa"]["last_result"]
+
+    assert qa_last_result["qa_summary"] == (
+        "QA validation completed."
+    )
+    assert qa_last_result["qa_model_passed"] is True
+    assert qa_last_result["qa_passed"] is True
+    assert qa_last_result["qa_defects"] == []
+    assert qa_last_result["qa_blockers"] == []
+    assert qa_last_result["qa_test_results"] == []
+
 
 def test_run_next_agent_requires_qa_capable_provider(
     tmp_path: Path,
@@ -317,6 +335,168 @@ def test_run_next_agent_requires_qa_capable_provider(
             project_root=tmp_path,
             provider=provider,
         )
+
+
+def test_run_next_agent_persists_qa_execution(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    test_file = (
+        tmp_path
+        / "tests"
+        / "test_qa_sample.py"
+    )
+
+    test_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    test_file.write_text(
+        "def test_qa_sample():\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {
+                    "status": "APPROVED",
+                    "last_result": {
+                        "implemented_files": [
+                            "src/app.py",
+                        ],
+                        "implementation_results": [
+                            {
+                                "task_id": "US-001",
+                                "summary": "Implemented.",
+                            }
+                        ],
+                    },
+                },
+                "qa": {"status": "READY"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "qa": [],
+                }
+            },
+        },
+    )
+
+    class QAExecutionProvider(DevelopmentModelProvider):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="QA orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            return QAResult(
+                summary="QA validation completed.",
+                passed=False,
+                defects=[
+                    QADefect(
+                        id="QA-001",
+                        title="Minor issue",
+                        severity="Low",
+                        related_story="US-001",
+                        expected="Expected behavior.",
+                        actual="Actual behavior.",
+                    )
+                ],
+                test_commands=[
+                    "python -m pytest tests/test_qa_sample.py -q",
+                ],
+            )
+
+    provider = QAExecutionProvider()
+
+    agent_name, _ = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "qa"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    qa_last_result = updated_state[
+        "agents"
+    ]["qa"]["last_result"]
+
+    assert qa_last_result["qa_summary"] == (
+        "QA validation completed."
+    )
+
+    assert qa_last_result["qa_model_passed"] is False
+    assert qa_last_result["qa_passed"] is False
+
+    assert qa_last_result["qa_defects"] == [
+        {
+            "id": "QA-001",
+            "title": "Minor issue",
+            "severity": "Low",
+            "related_story": "US-001",
+            "expected": "Expected behavior.",
+            "actual": "Actual behavior.",
+        }
+    ]
+
+    assert qa_last_result["qa_blockers"] == []
+
+    assert len(
+        qa_last_result["qa_test_results"]
+    ) == 1
+
+    assert (
+        qa_last_result["qa_test_results"][0]["passed"]
+        is True
+    )
 
 
 def test_run_next_agent_rejects_when_no_agent_is_ready(

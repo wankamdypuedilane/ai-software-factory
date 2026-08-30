@@ -254,6 +254,46 @@ def run_next_agent(
         result,
     )
 
+    if qa_execution is not None:
+        qa_state = state["agents"][agent_name]
+        qa_last_result = qa_state["last_result"]
+
+        qa_result = qa_execution.result
+
+        qa_last_result["qa_summary"] = (
+            qa_result.summary
+        )
+
+        qa_last_result["qa_model_passed"] = (
+            qa_result.passed
+        )
+
+        qa_last_result["qa_passed"] = (
+            qa_execution.passed
+        )
+
+        qa_last_result["qa_defects"] = [
+            {
+                "id": defect.id,
+                "title": defect.title,
+                "severity": defect.severity,
+                "related_story": defect.related_story,
+                "expected": defect.expected,
+                "actual": defect.actual,
+            }
+            for defect in qa_result.defects
+        ]
+
+        qa_last_result["qa_blockers"] = list(
+            qa_result.blockers
+        )
+
+        qa_last_result["qa_test_results"] = (
+            serialize_test_results(
+                qa_execution.test_results
+            )
+        )
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 
