@@ -4,7 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import (
+    OpenAI,
+    RateLimitError,
+)
 
 from ai_factory.agent_result import (
     AgentArtifact,
@@ -71,9 +74,15 @@ class OpenAIProvider(ModelProvider):
         if max_output_tokens is not None:
             request_kwargs["max_output_tokens"] = max_output_tokens
 
-        response = self.client.responses.create(
-            **request_kwargs,
-        )
+        try:
+            response = self.client.responses.create(
+                **request_kwargs,
+            )
+        except RateLimitError as error:
+            raise ValueError(
+                "OpenAI rate limit exceeded. "
+                "Retry later or use a model/provider with available capacity."
+            ) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -431,9 +440,15 @@ class OpenAIProvider(ModelProvider):
         if max_output_tokens is not None:
             request_kwargs["max_output_tokens"] = max_output_tokens
 
-        response = self.client.responses.create(
-            **request_kwargs,
-        )
+        try:
+            response = self.client.responses.create(
+                **request_kwargs,
+            )
+        except RateLimitError as error:
+            raise ValueError(
+                "OpenAI rate limit exceeded. "
+                "Retry later or use a model/provider with available capacity."
+            ) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(

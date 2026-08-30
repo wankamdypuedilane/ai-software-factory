@@ -547,3 +547,83 @@ def test_openai_provider_generate_rejects_empty_content(
         provider.generate(
             "artifact prompt"
         )
+
+
+def test_openai_provider_execute_handles_rate_limit(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeRateLimitError(Exception):
+        pass
+
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.RateLimitError",
+        FakeRateLimitError,
+    )
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            raise FakeRateLimitError(
+                "rate limit exceeded"
+            )
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="OpenAI rate limit exceeded",
+    ):
+        provider._execute(
+            "prepared prompt"
+        )
+
+
+def test_openai_provider_generate_handles_rate_limit(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    class FakeRateLimitError(Exception):
+        pass
+
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.RateLimitError",
+        FakeRateLimitError,
+    )
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            raise FakeRateLimitError(
+                "rate limit exceeded"
+            )
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="OpenAI rate limit exceeded",
+    ):
+        provider.generate(
+            "artifact prompt"
+        )
