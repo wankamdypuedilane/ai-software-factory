@@ -1,6 +1,7 @@
 from ai_factory.agent_result import (
     AgentArtifact,
     AgentArtifactRequest,
+    AgentImplementationRequest,
     AgentResult,
 )
 
@@ -104,3 +105,39 @@ def test_agent_result_artifact_request_defaults_are_independent() -> None:
 
     assert len(first.artifact_requests) == 1
     assert second.artifact_requests == []
+
+
+def test_agent_result_supports_implementation_requests() -> None:
+    request = AgentImplementationRequest(
+        id="US-001",
+        title="Passenger authentication",
+        purpose="Implement authentication with automated tests.",
+    )
+
+    result = AgentResult(
+        status="COMPLETED",
+        summary="Implementation planning completed.",
+        implementation_requests=[
+            request,
+        ],
+    )
+
+    assert len(result.implementation_requests) == 1
+
+    implementation_request = result.implementation_requests[0]
+
+    assert implementation_request.id == "US-001"
+    assert implementation_request.title == "Passenger authentication"
+    assert (
+        implementation_request.purpose
+        == "Implement authentication with automated tests."
+    )
+
+
+def test_agent_result_implementation_requests_default_to_empty() -> None:
+    result = AgentResult(
+        status="COMPLETED",
+        summary="No implementation work requested.",
+    )
+
+    assert result.implementation_requests == []
