@@ -3,6 +3,9 @@ from pathlib import Path
 
 from ai_factory.approval_runtime import apply_approval
 from ai_factory.design_gate import get_design_gate
+from ai_factory.design_gate_runtime import (
+    rebuild_design_gate_from_state,
+)
 from ai_factory.orchestrator import get_next_agent
 from ai_factory.project import initialize_project
 from ai_factory.provider_factory import create_provider
@@ -172,6 +175,19 @@ def main() -> None:
     approve_parser.add_argument(
         "approval_name",
         help="Approval to record",
+    )
+
+    design_parser = subparsers.add_parser(
+        "design",
+    )
+
+    design_subparsers = design_parser.add_subparsers(
+        dest="design_command",
+    )
+
+    design_subparsers.add_parser(
+        "rebuild",
+        help="Rebuild the Design Gate from persisted UX/UI results.",
     )
 
     technology_parser = subparsers.add_parser(
@@ -347,6 +363,27 @@ def main() -> None:
 
         except ValueError as error:
             parser.error(str(error))
+
+    elif args.command == "design":
+        if args.design_command == "rebuild":
+            project_root = Path.cwd()
+            state = load_state(
+                project_root / ".factory" / "state.yaml"
+            )
+
+            state = rebuild_design_gate_from_state(
+                state,
+            )
+
+            save_state(
+                project_root / ".factory" / "state.yaml",
+                state,
+            )
+
+            print(
+                "Design Gate rebuilt from persisted UX/UI results."
+            )
+            return
 
     elif args.command == "technology":
         state_path = Path.cwd() / ".factory" / "state.yaml"
