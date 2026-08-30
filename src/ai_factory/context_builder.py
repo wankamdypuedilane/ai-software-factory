@@ -6,6 +6,24 @@ from ai_factory.orchestrator import AGENT_ORDER
 from ai_factory.state import load_state
 
 
+MAX_ARTIFACT_CONTEXT_CHARS = 6000
+
+
+def trim_artifact_content(
+    content: str,
+    max_chars: int = MAX_ARTIFACT_CONTEXT_CHARS,
+) -> str:
+    """Limit artifact content included in an agent execution context."""
+
+    if len(content) <= max_chars:
+        return content
+
+    return (
+        content[:max_chars].rstrip()
+        + "\n\n[Artifact content truncated for execution context]"
+    )
+
+
 def load_context_artifacts(
     project_root: Path,
     project_config: dict[str, Any],
@@ -135,8 +153,12 @@ def load_upstream_generated_artifacts(
                     f"Upstream artifact not found: {relative_path}"
                 )
 
-            artifacts[relative_path] = artifact_path.read_text(
+            content = artifact_path.read_text(
                 encoding="utf-8",
+            )
+
+            artifacts[relative_path] = trim_artifact_content(
+                content
             )
 
     return artifacts

@@ -3,6 +3,7 @@ from pathlib import Path
 from ai_factory.context_builder import (
     build_agent_context,
     load_upstream_generated_artifacts,
+    trim_artifact_content,
 )
 from ai_factory.state import save_state
 
@@ -450,4 +451,84 @@ def test_build_agent_context_includes_upstream_generated_artifacts(
     assert (
         "Ride-hailing MVP."
         in context["artifacts"]["knowledge/project/vision.md"]
+    )
+
+
+def test_trim_artifact_content_keeps_short_content() -> None:
+    content = "Short artifact content."
+
+    result = trim_artifact_content(
+        content,
+        max_chars=100,
+    )
+
+    assert result == content
+
+
+def test_trim_artifact_content_truncates_long_content() -> None:
+    content = "A" * 200
+
+    result = trim_artifact_content(
+        content,
+        max_chars=100,
+    )
+
+    assert result.startswith("A" * 100)
+    assert (
+        "[Artifact content truncated for execution context]"
+        in result
+    )
+    assert len(result) < len(content)
+
+
+def test_upstream_artifacts_are_trimmed(
+    tmp_path: Path,
+) -> None:
+    artifact_path = (
+        tmp_path
+        / "knowledge"
+        / "project"
+        / "large.md"
+    )
+
+    artifact_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    artifact_path.write_text(
+        "A" * 10_000,
+        encoding="utf-8",
+    )
+
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+                "last_result": {
+                    "generated_artifacts": [
+                        "knowledge/project/large.md",
+                    ]
+                },
+            },
+            "ux_ui": {
+                "status": "READY",
+            },
+        }
+    }
+
+    artifacts = load_upstream_generated_artifacts(
+        project_root=tmp_path,
+        state=state,
+        agent_name="ux_ui",
+    )
+
+    content = artifacts[
+        "knowledge/project/large.md"
+    ]
+
+    assert len(content) < 10_000
+    assert (
+        "[Artifact content truncated for execution context]"
+        in content
     )
