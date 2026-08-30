@@ -192,6 +192,7 @@ def test_openai_provider_execute_uses_responses_api(
     assert "summary" in schema["properties"]
     assert "artifacts" in schema["properties"]
     assert "artifact_requests" in schema["properties"]
+    assert "implementation_requests" in schema["properties"]
     assert "questions" in schema["properties"]
     assert "blockers" in schema["properties"]
     assert "handoff" in schema["properties"]
@@ -203,6 +204,7 @@ def test_openai_provider_execute_uses_responses_api(
         "summary",
         "artifacts",
         "artifact_requests",
+        "implementation_requests",
         "questions",
         "blockers",
         "handoff",
@@ -627,3 +629,65 @@ def test_openai_provider_generate_handles_rate_limit(
         provider.generate(
             "artifact prompt"
         )
+
+
+def test_parse_result_supports_implementation_requests(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "status": "COMPLETED",
+        "summary": "Implementation planning completed.",
+        "artifacts": [],
+        "artifact_requests": [],
+        "implementation_requests": [
+            {
+                "id": "US-001",
+                "title": "Passenger authentication",
+                "purpose": "Implement authentication with automated tests."
+            },
+            {
+                "id": "US-002",
+                "title": "Ride request workflow",
+                "purpose": "Implement ride creation and status handling."
+            }
+        ],
+        "questions": [],
+        "blockers": [],
+        "handoff": null,
+        "metadata": {
+            "technology_proposal": {
+                "components": []
+            }
+        }
+    }
+    """
+
+    result = provider._parse_result(
+        raw_output
+    )
+
+    assert len(result.implementation_requests) == 2
+
+    first = result.implementation_requests[0]
+
+    assert first.id == "US-001"
+    assert first.title == "Passenger authentication"
+    assert (
+        first.purpose
+        == "Implement authentication with automated tests."
+    )
+
+    second = result.implementation_requests[1]
+
+    assert second.id == "US-002"
+    assert second.title == "Ride request workflow"

@@ -12,6 +12,7 @@ from openai import (
 from ai_factory.agent_result import (
     AgentArtifact,
     AgentArtifactRequest,
+    AgentImplementationRequest,
     AgentResult,
 )
 from ai_factory.prompt_builder import build_agent_prompt
@@ -265,6 +266,51 @@ class OpenAIProvider(ModelProvider):
                 )
             )
 
+        implementation_requests_data = data.get(
+            "implementation_requests",
+            [],
+        )
+
+        if not isinstance(implementation_requests_data, list):
+            raise ValueError(
+                "Agent result implementation requests must be a list."
+            )
+
+        implementation_requests = []
+
+        for request_data in implementation_requests_data:
+            if not isinstance(request_data, dict):
+                raise ValueError(
+                    "Invalid agent implementation request."
+                )
+
+            request_id = request_data.get("id")
+            title = request_data.get("title")
+            purpose = request_data.get("purpose")
+
+            if not isinstance(request_id, str) or not request_id.strip():
+                raise ValueError(
+                    "Implementation request id is required."
+                )
+
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError(
+                    "Implementation request title is required."
+                )
+
+            if not isinstance(purpose, str) or not purpose.strip():
+                raise ValueError(
+                    "Implementation request purpose is required."
+                )
+
+            implementation_requests.append(
+                AgentImplementationRequest(
+                    id=request_id,
+                    title=title,
+                    purpose=purpose,
+                )
+            )
+
         status = data.get("status")
         summary = data.get("summary")
 
@@ -283,6 +329,7 @@ class OpenAIProvider(ModelProvider):
             summary=summary,
             artifacts=artifacts,
             artifact_requests=artifact_requests,
+            implementation_requests=implementation_requests,
             questions=data.get("questions", []),
             blockers=data.get("blockers", []),
             handoff=data.get("handoff"),
@@ -358,6 +405,29 @@ class OpenAIProvider(ModelProvider):
                                 "additionalProperties": False,
                             },
                         },
+                        "implementation_requests": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                    },
+                                    "purpose": {
+                                        "type": "string",
+                                    },
+                                },
+                                "required": [
+                                    "id",
+                                    "title",
+                                    "purpose",
+                                ],
+                                "additionalProperties": False,
+                            },
+                        },
                         "questions": {
                             "type": "array",
                             "items": {
@@ -423,6 +493,7 @@ class OpenAIProvider(ModelProvider):
                         "summary",
                         "artifacts",
                         "artifact_requests",
+                        "implementation_requests",
                         "questions",
                         "blockers",
                         "handoff",
