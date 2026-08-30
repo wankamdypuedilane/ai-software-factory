@@ -872,6 +872,9 @@ def test_run_next_agent_skips_previously_completed_developer_tasks(
                                 "files": [],
                             },
                         ],
+                        "implemented_files": [
+                            "src/auth.py",
+                        ],
                     },
                 },
                 "qa": {"status": "NOT_STARTED"},
@@ -941,11 +944,23 @@ def test_run_next_agent_skips_previously_completed_developer_tasks(
                 return ImplementationResult(
                     task_id="US-002",
                     summary="Ride creation implemented.",
+                    files=[
+                        ImplementationFileChange(
+                            path="src/rides.py",
+                            content="# rides",
+                        )
+                    ],
                 )
 
             return ImplementationResult(
                 task_id="US-003",
                 summary="Ride completion implemented.",
+                files=[
+                    ImplementationFileChange(
+                        path="src/completion.py",
+                        content="# completion",
+                    )
+                ],
             )
 
     provider = ResumeDeveloperProvider()
@@ -963,6 +978,12 @@ def test_run_next_agent_skips_previously_completed_developer_tasks(
     last_result = developer["last_result"]
 
     history = last_result["implementation_results"]
+
+    assert last_result["implemented_files"] == [
+        "src/auth.py",
+        "src/rides.py",
+        "src/completion.py",
+    ]
 
     assert agent_name == "developer"
 

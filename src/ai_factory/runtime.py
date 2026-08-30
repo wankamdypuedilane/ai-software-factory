@@ -95,6 +95,7 @@ def run_next_agent(
     ]
 
     previous_implementation_results = []
+    previous_implemented_files = []
 
     if agent_name == "developer":
         previous_developer_state = state["agents"].get(
@@ -118,6 +119,18 @@ def run_next_agent(
                     previous_implementation_results = list(
                         stored_results
                     )
+
+                stored_files = previous_last_result.get(
+                    "implemented_files",
+                    [],
+                )
+
+                if isinstance(stored_files, list):
+                    previous_implemented_files = [
+                        path
+                        for path in stored_files
+                        if isinstance(path, str)
+                    ]
 
     state = apply_agent_result(
         state,
@@ -149,10 +162,17 @@ def run_next_agent(
             )
         )
 
-        developer_result["implemented_files"] = [
+        new_implemented_files = [
             path.relative_to(project_root).as_posix()
             for path in implementation_batch.written_files
         ]
+
+        developer_result["implemented_files"] = list(
+            dict.fromkeys(
+                previous_implemented_files
+                + new_implemented_files
+            )
+        )
 
         developer_result["implementation_blocked"] = (
             implementation_batch.blocked
