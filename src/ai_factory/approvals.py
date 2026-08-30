@@ -5,6 +5,7 @@ VALID_APPROVALS = {
     "product_scope",
     "design",
     "architecture",
+    "development",
     "production_deployment",
 }
 

@@ -332,3 +332,91 @@ def test_technology_then_architecture_approval_flow(
     assert state["approvals"]["architecture"] is True
     assert state["agents"]["architect"]["status"] == "APPROVED"
     assert state["agents"]["developer"]["status"] == "READY"
+
+
+def test_apply_development_approval_requires_ready_gate() -> None:
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": True,
+            "development": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "developer": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "development_gate": {
+            "status": "NOT_READY",
+            "reasons": [
+                "Developer implementation tests failed.",
+            ],
+            "human_approval": False,
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Development Gate is not ready",
+    ):
+        apply_approval(
+            state,
+            "development",
+        )
+
+    assert state["approvals"]["development"] is False
+    assert state["agents"]["developer"]["status"] == "REVIEW_REQUIRED"
+    assert state["agents"]["qa"]["status"] == "NOT_STARTED"
+
+
+def test_apply_development_approval_activates_qa() -> None:
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": True,
+            "development": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "developer": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+            "security": {
+                "status": "NOT_STARTED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "development_gate": {
+            "status": "READY_FOR_REVIEW",
+            "reasons": [],
+            "human_approval": False,
+        },
+    }
+
+    updated_state = apply_approval(
+        state,
+        "development",
+    )
+
+    assert updated_state["approvals"]["development"] is True
+    assert updated_state["agents"]["developer"]["status"] == "APPROVED"
+    assert updated_state["agents"]["qa"]["status"] == "READY"
+
+    gate = updated_state["development_gate"]
+
+    assert gate["status"] == "APPROVED"
+    assert gate["human_approval"] is True

@@ -10,6 +10,7 @@ APPROVAL_AGENT_MAP = {
     "product_scope": "product",
     "design": "ux_ui",
     "architecture": "architect",
+    "development": "developer",
 }
 
 
@@ -44,6 +45,28 @@ def apply_approval(
             f"Agent '{agent_name}' is not waiting for review."
         )
 
+    if approval_name == "development":
+        development_gate = state.get(
+            "development_gate"
+        )
+
+        if not isinstance(
+            development_gate,
+            dict,
+        ):
+            raise ValueError(
+                "Project state does not contain a valid development_gate."
+            )
+
+        if (
+            development_gate.get("status")
+            != "READY_FOR_REVIEW"
+        ):
+            raise ValueError(
+                "Development cannot be approved: "
+                "the Development Gate is not ready for human approval."
+            )
+
     state = set_agent_status(
         state,
         agent_name,
@@ -55,6 +78,19 @@ def apply_approval(
         state,
         approval_name,
     )
+
+    if approval_name == "development":
+        development_gate = state[
+            "development_gate"
+        ]
+
+        development_gate[
+            "human_approval"
+        ] = True
+
+        development_gate[
+            "status"
+        ] = "APPROVED"
 
     if approval_name == "design":
         design_gate = state.get("design_gate")
