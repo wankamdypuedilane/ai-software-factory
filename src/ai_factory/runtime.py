@@ -3,6 +3,9 @@ from pathlib import Path
 from ai_factory.agent_runner import run_agent
 from ai_factory.artifact_runtime import run_artifact_generation
 from ai_factory.context_builder import build_agent_context
+from ai_factory.design_gate_runtime import (
+    update_design_gate_from_result,
+)
 from ai_factory.orchestrator import (
     get_execution_blocker,
     get_next_agent,
@@ -70,6 +73,13 @@ def run_next_agent(
         state["agents"][agent_name]["last_result"][
             "generated_artifacts"
         ] = generated_paths
+
+    if agent_name == "ux_ui":
+        state = update_design_gate_from_result(
+            state=state,
+            result=result,
+            generated_paths=generated_paths,
+        )
 
     save_state(
         state_path,

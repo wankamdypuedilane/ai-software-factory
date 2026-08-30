@@ -272,3 +272,113 @@ def test_cli_run_executes_next_agent(
         in output
     )
     assert "Handoff: none" in output
+
+
+def test_run_next_agent_updates_design_gate_for_ux_ui(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {
+                    "status": "APPROVED",
+                },
+                "ux_ui": {
+                    "status": "READY",
+                },
+                "architect": {
+                    "status": "NOT_STARTED",
+                },
+                "developer": {
+                    "status": "NOT_STARTED",
+                },
+                "qa": {
+                    "status": "NOT_STARTED",
+                },
+                "security": {
+                    "status": "NOT_STARTED",
+                },
+                "devops": {
+                    "status": "NOT_STARTED",
+                },
+                "sre": {
+                    "status": "NOT_STARTED",
+                },
+            },
+            "design_gate": {
+                "status": "NOT_STARTED",
+                "groups": {},
+                "external_blockers": [],
+                "human_approval": False,
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "context": {
+                "agents": {
+                    "ux_ui": [],
+                }
+            },
+        },
+    )
+
+    class UXUIRuntimeProvider(ModelProvider):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="UX/UI completed.",
+                artifact_requests=[
+                    AgentArtifactRequest(
+                        path="design/ux-ui/user-flows.md",
+                        purpose="Document user flows.",
+                    ),
+                    AgentArtifactRequest(
+                        path="design/ux-ui/screen-specs.md",
+                        purpose="Document screen specifications.",
+                    ),
+                ],
+                handoff="architect",
+            )
+
+        def generate(self, prompt: str) -> str:
+            return "# Generated UX/UI Artifact"
+
+    provider = UXUIRuntimeProvider()
+
+    agent_name, result = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "ux_ui"
+    assert result.status == "COMPLETED"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert updated_state["agents"]["ux_ui"]["status"] == "REVIEW_REQUIRED"
+
+    gate = updated_state["design_gate"]
+
+    assert gate["status"] == "READY_FOR_REVIEW"
+    assert gate["groups"]["deliverables"] == {
+        "approved": 2,
+        "total": 2,
+    }
+    assert gate["external_blockers"] == []
+    assert gate["human_approval"] is False
