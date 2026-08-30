@@ -133,6 +133,27 @@ class OpenAIProvider(ModelProvider):
             + "Do not wrap the JSON in Markdown code fences."
         )
 
+        if context.get("agent_name") == "architect":
+            structured_prompt += (
+                "\n\n"
+                "## Architect Technology Proposal Requirement\n"
+                "Because this project may require a Technology Gate, "
+                "include a technology proposal in metadata using this structure:\n"
+                "{\n"
+                '  "technology_proposal": {\n'
+                '    "components": {\n'
+                '      "component_name": {\n'
+                '        "technology": "selected technology",\n'
+                '        "rationale": "concise justification"\n'
+                "      }\n"
+                "    }\n"
+                "  }\n"
+                "}\n"
+                "Include only components that are relevant to the project. "
+                "Base every recommendation on the supplied requirements, "
+                "constraints, UX/UI artifacts, and architecture context."
+            )
+
         raw_output = self._execute(
             structured_prompt,
         )
@@ -348,8 +369,43 @@ class OpenAIProvider(ModelProvider):
                         },
                         "metadata": {
                             "type": "object",
+                            "properties": {
+                                "technology_proposal": {
+                                    "type": [
+                                        "object",
+                                        "null",
+                                    ],
+                                    "properties": {
+                                        "components": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "technology": {
+                                                        "type": "string",
+                                                    },
+                                                    "rationale": {
+                                                        "type": "string",
+                                                    },
+                                                },
+                                                "required": [
+                                                    "technology",
+                                                    "rationale",
+                                                ],
+                                                "additionalProperties": False,
+                                            },
+                                        },
+                                    },
+                                    "required": [
+                                        "components",
+                                    ],
+                                    "additionalProperties": False,
+                                },
+                            },
+                            "required": [
+                                "technology_proposal",
+                            ],
                             "additionalProperties": False,
-                            "properties": {},
                         },
                     },
                     "required": [
