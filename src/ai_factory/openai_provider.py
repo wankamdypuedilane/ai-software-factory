@@ -15,6 +15,10 @@ from ai_factory.agent_result import (
     AgentImplementationRequest,
     AgentResult,
 )
+from ai_factory.implementation_result import (
+    ImplementationFileChange,
+    ImplementationResult,
+)
 from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import ModelProvider
 
@@ -601,3 +605,101 @@ class OpenAIProvider(ModelProvider):
             )
 
         return response.output_text
+
+    def _parse_implementation_result(
+        self,
+        raw_output: str,
+    ) -> ImplementationResult:
+        """Parse a structured implementation result."""
+
+        try:
+            data = json.loads(raw_output)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "OpenAI returned invalid implementation JSON."
+            ) from error
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                "Implementation result must be an object."
+            )
+
+        task_id = data.get("task_id")
+        summary = data.get("summary")
+        files_data = data.get("files", [])
+        tests = data.get("tests", [])
+        blockers = data.get("blockers", [])
+
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError(
+                "Implementation result task_id is required."
+            )
+
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError(
+                "Implementation result summary is required."
+            )
+
+        if not isinstance(files_data, list):
+            raise ValueError(
+                "Implementation result files must be a list."
+            )
+
+        if not isinstance(tests, list) or not all(
+            isinstance(test, str)
+            for test in tests
+        ):
+            raise ValueError(
+                "Implementation result tests must be a list of strings."
+            )
+
+        if not isinstance(blockers, list) or not all(
+            isinstance(blocker, str)
+            for blocker in blockers
+        ):
+            raise ValueError(
+                "Implementation result blockers must be a list of strings."
+            )
+
+        files: list[ImplementationFileChange] = []
+
+        for file_data in files_data:
+            if not isinstance(file_data, dict):
+                raise ValueError(
+                    "Invalid implementation file change."
+                )
+
+            path = file_data.get("path")
+            content = file_data.get("content")
+            operation = file_data.get("operation")
+
+            if not isinstance(path, str) or not path.strip():
+                raise ValueError(
+                    "Implementation file path is required."
+                )
+
+            if not isinstance(content, str):
+                raise ValueError(
+                    "Implementation file content must be a string."
+                )
+
+            if operation != "write":
+                raise ValueError(
+                    f"Unsupported implementation operation: {operation}"
+                )
+
+            files.append(
+                ImplementationFileChange(
+                    path=path,
+                    content=content,
+                    operation=operation,
+                )
+            )
+
+        return ImplementationResult(
+            task_id=task_id,
+            summary=summary,
+            files=files,
+            tests=tests,
+            blockers=blockers,
+        )
