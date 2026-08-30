@@ -779,6 +779,125 @@ def test_build_qa_result_schema() -> None:
     ]
 
 
+def test_parse_qa_result(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "QA validation completed.",
+        "passed": false,
+        "defects": [
+            {
+                "id": "QA-001",
+                "title": "Invalid credentials return 500",
+                "severity": "High",
+                "related_story": "US-001",
+                "expected": "401 response",
+                "actual": "500 response"
+            }
+        ],
+        "test_commands": [
+            "python -m pytest tests/test_auth.py -q"
+        ],
+        "blockers": []
+    }
+    """
+
+    result = provider._parse_qa_result(
+        raw_output
+    )
+
+    assert result.summary == "QA validation completed."
+    assert result.passed is False
+
+    assert len(result.defects) == 1
+
+    defect = result.defects[0]
+
+    assert defect.id == "QA-001"
+    assert defect.title == "Invalid credentials return 500"
+    assert defect.severity == "High"
+    assert defect.related_story == "US-001"
+    assert defect.expected == "401 response"
+    assert defect.actual == "500 response"
+
+    assert result.test_commands == [
+        "python -m pytest tests/test_auth.py -q"
+    ]
+
+    assert result.blockers == []
+
+
+def test_parse_qa_result_rejects_invalid_json(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="invalid QA JSON",
+    ):
+        provider._parse_qa_result(
+            "not-json"
+        )
+
+
+def test_parse_qa_result_rejects_invalid_severity(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "QA validation completed.",
+        "passed": false,
+        "defects": [
+            {
+                "id": "QA-001",
+                "title": "Broken behavior",
+                "severity": "Extreme",
+                "related_story": "US-001",
+                "expected": "Expected behavior",
+                "actual": "Actual behavior"
+            }
+        ],
+        "test_commands": [],
+        "blockers": []
+    }
+    """
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid QA defect severity",
+    ):
+        provider._parse_qa_result(
+            raw_output
+        )
+
+
 def test_parse_implementation_result(
     monkeypatch,
 ) -> None:

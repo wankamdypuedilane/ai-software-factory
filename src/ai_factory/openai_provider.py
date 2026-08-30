@@ -19,6 +19,10 @@ from ai_factory.implementation_result import (
     ImplementationFileChange,
     ImplementationResult,
 )
+from ai_factory.qa_result import (
+    QADefect,
+    QAResult,
+)
 from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import DevelopmentModelProvider
 
@@ -835,5 +839,128 @@ class OpenAIProvider(DevelopmentModelProvider):
             summary=summary,
             files=files,
             tests=tests,
+            blockers=blockers,
+        )
+
+    def _parse_qa_result(
+        self,
+        raw_output: str,
+    ) -> QAResult:
+        """Parse a structured QA result."""
+
+        try:
+            data = json.loads(raw_output)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "OpenAI returned invalid QA JSON."
+            ) from error
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                "QA result must be an object."
+            )
+
+        summary = data.get("summary")
+        passed = data.get("passed")
+        defects_data = data.get("defects", [])
+        test_commands = data.get(
+            "test_commands",
+            [],
+        )
+        blockers = data.get("blockers", [])
+
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError(
+                "QA result summary is required."
+            )
+
+        if not isinstance(passed, bool):
+            raise ValueError(
+                "QA result passed must be a boolean."
+            )
+
+        if not isinstance(defects_data, list):
+            raise ValueError(
+                "QA result defects must be a list."
+            )
+
+        if not isinstance(test_commands, list) or not all(
+            isinstance(command, str)
+            for command in test_commands
+        ):
+            raise ValueError(
+                "QA result test_commands must be a list of strings."
+            )
+
+        if not isinstance(blockers, list) or not all(
+            isinstance(blocker, str)
+            for blocker in blockers
+        ):
+            raise ValueError(
+                "QA result blockers must be a list of strings."
+            )
+
+        defects: list[QADefect] = []
+
+        valid_severities = {
+            "Critical",
+            "High",
+            "Medium",
+            "Low",
+        }
+
+        for defect_data in defects_data:
+            if not isinstance(defect_data, dict):
+                raise ValueError(
+                    "Invalid QA defect."
+                )
+
+            defect_id = defect_data.get("id")
+            title = defect_data.get("title")
+            severity = defect_data.get("severity")
+            related_story = defect_data.get(
+                "related_story"
+            )
+            expected = defect_data.get("expected")
+            actual = defect_data.get("actual")
+
+            string_fields = {
+                "id": defect_id,
+                "title": title,
+                "related_story": related_story,
+                "expected": expected,
+                "actual": actual,
+            }
+
+            for field_name, value in string_fields.items():
+                if (
+                    not isinstance(value, str)
+                    or not value.strip()
+                ):
+                    raise ValueError(
+                        f"QA defect {field_name} is required."
+                    )
+
+            if severity not in valid_severities:
+                raise ValueError(
+                    f"Invalid QA defect severity: {severity}"
+                )
+
+            defects.append(
+                QADefect(
+                    id=defect_id,
+                    title=title,
+                    severity=severity,
+                    related_story=related_story,
+                    expected=expected,
+                    actual=actual,
+                )
+            )
+
+        return QAResult(
+            summary=summary,
+            passed=passed,
+            defects=defects,
+            test_commands=test_commands,
             blockers=blockers,
         )
