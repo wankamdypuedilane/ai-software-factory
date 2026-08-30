@@ -308,6 +308,66 @@ class OpenAIProvider(DevelopmentModelProvider):
             response.output_text,
         )
 
+    def validate_qa(
+        self,
+        prompt: str,
+    ) -> QAResult:
+        """Execute structured QA validation."""
+
+        request_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "input": prompt,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "qa_result",
+                    "strict": True,
+                    "schema": build_qa_result_schema(),
+                }
+            },
+        }
+
+        max_output_tokens = self.settings.get(
+            "max_output_tokens"
+        )
+
+        if max_output_tokens is not None:
+            request_kwargs[
+                "max_output_tokens"
+            ] = max_output_tokens
+
+        try:
+            response = self.client.responses.create(
+                **request_kwargs,
+            )
+        except RateLimitError as error:
+            raise ValueError(
+                "OpenAI rate limit exceeded. "
+                "Retry later or use a model/provider "
+                "with available capacity."
+            ) from error
+
+        if response.status == "incomplete":
+            incomplete_details = getattr(
+                response,
+                "incomplete_details",
+                None,
+            )
+
+            raise ValueError(
+                "OpenAI QA response was incomplete. "
+                f"Details: {incomplete_details}"
+            )
+
+        if not response.output_text:
+            raise ValueError(
+                "OpenAI returned no QA content."
+            )
+
+        return self._parse_qa_result(
+            response.output_text,
+        )
+
     def run(
         self,
         context: dict[str, Any],

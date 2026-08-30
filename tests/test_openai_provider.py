@@ -898,6 +898,79 @@ def test_parse_qa_result_rejects_invalid_severity(
         )
 
 
+def test_validate_qa_uses_structured_output(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    captured_kwargs = {}
+
+    class FakeResponse:
+        status = "completed"
+        output_text = """
+        {
+            "summary": "QA validation completed.",
+            "passed": true,
+            "defects": [],
+            "test_commands": [
+                "python -m pytest -q"
+            ],
+            "blockers": []
+        }
+        """
+
+    def fake_create(**kwargs):
+        captured_kwargs.update(
+            kwargs
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        provider.client.responses,
+        "create",
+        fake_create,
+    )
+
+    result = provider.validate_qa(
+        "Validate the application."
+    )
+
+    assert captured_kwargs["model"] == "test-model"
+    assert captured_kwargs["input"] == (
+        "Validate the application."
+    )
+
+    output_format = (
+        captured_kwargs["text"]["format"]
+    )
+
+    assert output_format["type"] == "json_schema"
+    assert output_format["name"] == "qa_result"
+    assert output_format["strict"] is True
+
+    assert (
+        output_format["schema"]
+        == build_qa_result_schema()
+    )
+
+    assert result.summary == (
+        "QA validation completed."
+    )
+    assert result.passed is True
+    assert result.defects == []
+    assert result.test_commands == [
+        "python -m pytest -q"
+    ]
+    assert result.blockers == []
+
+
 def test_parse_implementation_result(
     monkeypatch,
 ) -> None:
