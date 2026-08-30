@@ -5,6 +5,7 @@ from ai_factory.agent_result import AgentResult
 from ai_factory.implementation_provider import (
     ImplementationProvider,
 )
+from ai_factory.qa_result import QAResult
 
 
 class ModelProvider(ABC):
@@ -19,9 +20,20 @@ class ModelProvider(ABC):
         raise NotImplementedError
 
 
+class QAProvider:
+    """Provider capable of performing structured QA validation."""
+
+    def validate_qa(
+        self,
+        prompt: str,
+    ) -> QAResult:
+        raise NotImplementedError
+
+
 class DevelopmentModelProvider(
     ModelProvider,
     ImplementationProvider,
+    QAProvider,
 ):
     """Provider capable of agent and implementation execution."""
 
