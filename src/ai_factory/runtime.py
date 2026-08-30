@@ -6,6 +6,9 @@ from ai_factory.context_builder import build_agent_context
 from ai_factory.design_gate_runtime import (
     update_design_gate_from_result,
 )
+from ai_factory.implementation_batch import (
+    run_implementation_batch,
+)
 from ai_factory.orchestrator import (
     get_execution_blocker,
     get_next_agent,
@@ -54,6 +57,17 @@ def run_next_agent(
     )
     config = context["project"]
 
+    implementation_batch = None
+
+    if agent_name == "developer":
+        implementation_batch = run_implementation_batch(
+            project_root=project_root,
+            agent_name=agent_name,
+            agent_result=result,
+            context=context,
+            provider=provider,
+        )
+
     generated_artifacts = run_artifact_generation(
         project_root=project_root,
         agent_name=agent_name,
@@ -72,6 +86,32 @@ def run_next_agent(
         agent_name,
         result,
     )
+
+    if implementation_batch is not None:
+        developer_result = state["agents"][agent_name]["last_result"]
+
+        developer_result["implementation_results"] = [
+            {
+                "task_id": item.task_id,
+                "summary": item.summary,
+                "tests": list(item.tests),
+                "blockers": list(item.blockers),
+                "files": [
+                    change.path
+                    for change in item.files
+                ],
+            }
+            for item in implementation_batch.results
+        ]
+
+        developer_result["implemented_files"] = [
+            path.relative_to(project_root).as_posix()
+            for path in implementation_batch.written_files
+        ]
+
+        developer_result["implementation_blocked"] = (
+            implementation_batch.blocked
+        )
 
     if generated_paths:
         state["agents"][agent_name]["last_result"][

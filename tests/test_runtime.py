@@ -4,9 +4,18 @@ import pytest
 
 from ai_factory.agent_result import (
     AgentArtifactRequest,
+    AgentImplementationRequest,
     AgentResult,
 )
-from ai_factory.providers import MockProvider, ModelProvider
+from ai_factory.implementation_result import (
+    ImplementationFileChange,
+    ImplementationResult,
+)
+from ai_factory.providers import (
+    DevelopmentModelProvider,
+    MockProvider,
+    ModelProvider,
+)
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
 
@@ -521,3 +530,178 @@ def test_run_next_agent_updates_technology_gate_for_architect(
             },
         }
     }
+
+
+def test_run_next_agent_executes_developer_implementation_batch(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {
+                    "status": "APPROVED",
+                },
+                "ux_ui": {
+                    "status": "APPROVED",
+                },
+                "architect": {
+                    "status": "APPROVED",
+                },
+                "developer": {
+                    "status": "READY",
+                },
+                "qa": {
+                    "status": "NOT_STARTED",
+                },
+                "security": {
+                    "status": "NOT_STARTED",
+                },
+                "devops": {
+                    "status": "NOT_STARTED",
+                },
+                "sre": {
+                    "status": "NOT_STARTED",
+                },
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {
+                    "backend": {
+                        "technology": "Django",
+                        "rationale": "Test backend.",
+                    }
+                },
+            },
+            "context": {
+                "agents": {
+                    "developer": [],
+                }
+            },
+        },
+    )
+
+    class DeveloperRuntimeProvider(DevelopmentModelProvider):
+        def __init__(self) -> None:
+            self.implementation_index = 0
+
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Implementation planned.",
+                implementation_requests=[
+                    AgentImplementationRequest(
+                        id="US-001",
+                        title="Authentication",
+                        purpose="Implement authentication.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-002",
+                        title="Ride creation",
+                        purpose="Implement ride creation.",
+                    ),
+                ],
+                handoff="qa",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            self.implementation_index += 1
+
+            if self.implementation_index == 1:
+                return ImplementationResult(
+                    task_id="US-001",
+                    summary="Authentication implemented.",
+                    files=[
+                        ImplementationFileChange(
+                            path="src/auth.py",
+                            content="# auth",
+                        )
+                    ],
+                    tests=[
+                        "pytest tests/test_auth.py",
+                    ],
+                )
+
+            return ImplementationResult(
+                task_id="US-002",
+                summary="Ride creation implemented.",
+                files=[
+                    ImplementationFileChange(
+                        path="src/rides.py",
+                        content="# rides",
+                    )
+                ],
+                tests=[
+                    "pytest tests/test_rides.py",
+                ],
+            )
+
+    provider = DeveloperRuntimeProvider()
+
+    agent_name, result = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "developer"
+    assert result.status == "COMPLETED"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    developer = updated_state["agents"]["developer"]
+
+    assert developer["status"] == "REVIEW_REQUIRED"
+
+    last_result = developer["last_result"]
+
+    assert len(
+        last_result["implementation_results"]
+    ) == 2
+
+    assert last_result["implementation_results"][0][
+        "task_id"
+    ] == "US-001"
+
+    assert last_result["implementation_results"][1][
+        "task_id"
+    ] == "US-002"
+
+    assert last_result["implemented_files"] == [
+        "src/auth.py",
+        "src/rides.py",
+    ]
+
+    assert (
+        last_result["implementation_blocked"]
+        is False
+    )
+
+    assert (
+        tmp_path / "src" / "auth.py"
+    ).exists()
+
+    assert (
+        tmp_path / "src" / "rides.py"
+    ).exists()
