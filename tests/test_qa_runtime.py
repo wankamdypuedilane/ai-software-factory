@@ -205,9 +205,110 @@ def test_run_qa_validation_executes_declared_tests(
 
     test_result = execution.test_results[0]
 
-    assert (
-        test_result.command
-        == "python -m pytest tests/test_qa_sample.py -q"
+
+def test_qa_execution_passes_when_model_and_tests_pass(
+    tmp_path: Path,
+) -> None:
+    test_file = (
+        tmp_path
+        / "tests"
+        / "test_pass.py"
     )
-    assert test_result.returncode == 0
-    assert test_result.passed is True
+
+    test_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    test_file.write_text(
+        "def test_pass():\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+
+    result = QAResult(
+        summary="QA passed.",
+        passed=True,
+        test_commands=[
+            "python -m pytest tests/test_pass.py -q",
+        ],
+    )
+
+    provider = FakeQAProvider(
+        result
+    )
+
+    execution = run_qa_validation(
+        project_root=tmp_path,
+        context={},
+        provider=provider,
+    )
+
+    assert execution.passed is True
+
+
+def test_qa_execution_fails_when_real_test_fails(
+    tmp_path: Path,
+) -> None:
+    test_file = (
+        tmp_path
+        / "tests"
+        / "test_fail.py"
+    )
+
+    test_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    test_file.write_text(
+        "def test_fail():\n"
+        "    assert False\n",
+        encoding="utf-8",
+    )
+
+    result = QAResult(
+        summary="QA model reported success.",
+        passed=True,
+        test_commands=[
+            "python -m pytest tests/test_fail.py -q",
+        ],
+    )
+
+    provider = FakeQAProvider(
+        result
+    )
+
+    execution = run_qa_validation(
+        project_root=tmp_path,
+        context={},
+        provider=provider,
+    )
+
+    assert execution.result.passed is True
+    assert execution.test_results[0].passed is False
+    assert execution.passed is False
+
+
+def test_qa_execution_fails_when_blocked(
+    tmp_path: Path,
+) -> None:
+    result = QAResult(
+        summary="QA blocked.",
+        passed=True,
+        blockers=[
+            "Required test environment is unavailable.",
+        ],
+    )
+
+    provider = FakeQAProvider(
+        result
+    )
+
+    execution = run_qa_validation(
+        project_root=tmp_path,
+        context={},
+        provider=provider,
+    )
+
+    assert execution.passed is False

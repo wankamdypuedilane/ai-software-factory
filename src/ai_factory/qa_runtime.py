@@ -19,6 +19,17 @@ class QAExecution:
     prompt: str
     test_results: list[CommandExecutionResult]
 
+    @property
+    def passed(self) -> bool:
+        return (
+            self.result.passed
+            and all(
+                test_result.passed
+                for test_result in self.test_results
+            )
+            and not self.result.blockers
+        )
+
 
 def run_qa_validation(
     project_root: Path,
