@@ -143,6 +143,9 @@ def test_technology_approve_updates_gate(
         {
             "technology": {
                 "selection_mode": "recommend",
+                "selected": {
+                    "frontend": {},
+                },
             }
         },
     )
@@ -155,9 +158,9 @@ def test_technology_approve_updates_gate(
                 "human_approval": False,
                 "proposal": {
                     "components": {
-                        "backend": {
-                            "technology": "Example Backend",
-                            "rationale": "Fits the project requirements.",
+                        "frontend": {
+                            "technology": "React",
+                            "rationale": "Suitable for the web UI.",
                         }
                     }
                 },
@@ -179,18 +182,25 @@ def test_technology_approve_updates_gate(
 
     output = capsys.readouterr().out
 
-    assert "Technology proposal approved." in output
+    assert (
+        "Technology proposal approved and applied to project configuration."
+        in output
+    )
 
-    updated_state = load_state(
+    state = load_state(
         factory_dir / "state.yaml"
     )
 
-    assert (
-        updated_state["technology_gate"]["status"]
-        == "APPROVED"
+    config = load_state(
+        factory_dir / "project.yaml"
     )
 
-    assert (
-        updated_state["technology_gate"]["human_approval"]
-        is True
-    )
+    assert state["technology_gate"]["status"] == "APPROVED"
+    assert state["technology_gate"]["human_approval"] is True
+
+    selected = config["technology"]["selected"]
+
+    assert selected["frontend"] == {
+        "technology": "React",
+        "rationale": "Suitable for the web UI.",
+    }

@@ -18,6 +18,9 @@ from ai_factory.technology_gate import (
     is_technology_gate_approved,
     submit_technology_proposal,
 )
+from ai_factory.technology_selection import (
+    apply_approved_technology_to_config,
+)
 from ai_factory.transitions import retry_agent, set_agent_status
 
 
@@ -455,11 +458,29 @@ def main() -> None:
 
         elif args.technology_command == "approve":
             try:
-                state = approve_technology_gate(state)
+                state = approve_technology_gate(
+                    state
+                )
 
-                save_state(state_path, state)
+                config = apply_approved_technology_to_config(
+                    config=config,
+                    state=state,
+                )
 
-                print("Technology proposal approved.")
+                save_state(
+                    state_path,
+                    state,
+                )
+
+                save_state(
+                    project_config_path,
+                    config,
+                )
+
+                print(
+                    "Technology proposal approved and applied to project "
+                    "configuration."
+                )
 
             except ValueError as error:
                 parser.error(str(error))
