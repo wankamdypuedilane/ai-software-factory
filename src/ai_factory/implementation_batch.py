@@ -6,6 +6,9 @@ from ai_factory.agent_result import AgentResult
 from ai_factory.implementation_provider import (
     ImplementationProvider,
 )
+from ai_factory.implementation_resume import (
+    filter_pending_implementation_requests,
+)
 from ai_factory.implementation_request import (
     build_implementation_tasks,
 )
@@ -34,12 +37,24 @@ def run_implementation_batch(
     agent_result: AgentResult,
     context: dict[str, Any],
     provider: ImplementationProvider,
+    completed_task_ids: set[str] | None = None,
 ) -> ImplementationBatchResult:
-    """Execute implementation requests sequentially."""
+    """Execute pending implementation requests sequentially."""
+
+    completed_task_ids = (
+        completed_task_ids
+        if completed_task_ids is not None
+        else set()
+    )
+
+    pending_requests = filter_pending_implementation_requests(
+        requests=agent_result.implementation_requests,
+        completed_task_ids=completed_task_ids,
+    )
 
     tasks = build_implementation_tasks(
         agent_name=agent_name,
-        requests=agent_result.implementation_requests,
+        requests=pending_requests,
     )
 
     batch = ImplementationBatchResult()
