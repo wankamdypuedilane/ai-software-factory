@@ -19,6 +19,68 @@ from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import ModelProvider
 
 
+def build_implementation_result_schema() -> dict:
+    """Build the strict JSON schema for implementation results."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "task_id": {
+                "type": "string",
+            },
+            "summary": {
+                "type": "string",
+            },
+            "files": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                        },
+                        "content": {
+                            "type": "string",
+                        },
+                        "operation": {
+                            "type": "string",
+                            "enum": [
+                                "write",
+                            ],
+                        },
+                    },
+                    "required": [
+                        "path",
+                        "content",
+                        "operation",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "tests": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "blockers": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+        },
+        "required": [
+            "task_id",
+            "summary",
+            "files",
+            "tests",
+            "blockers",
+        ],
+        "additionalProperties": False,
+    }
+
+
 class OpenAIProvider(ModelProvider):
     """OpenAI-backed model provider."""
 

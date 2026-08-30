@@ -1,6 +1,9 @@
 import pytest
 
-from ai_factory.openai_provider import OpenAIProvider
+from ai_factory.openai_provider import (
+    OpenAIProvider,
+    build_implementation_result_schema,
+)
 
 
 def test_openai_provider_requires_model(
@@ -691,3 +694,41 @@ def test_parse_result_supports_implementation_requests(
 
     assert second.id == "US-002"
     assert second.title == "Ride request workflow"
+
+
+def test_build_implementation_result_schema() -> None:
+    schema = build_implementation_result_schema()
+
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+
+    assert set(schema["required"]) == {
+        "task_id",
+        "summary",
+        "files",
+        "tests",
+        "blockers",
+    }
+
+    properties = schema["properties"]
+
+    assert "task_id" in properties
+    assert "summary" in properties
+    assert "files" in properties
+    assert "tests" in properties
+    assert "blockers" in properties
+
+    file_schema = properties["files"]["items"]
+
+    assert file_schema["type"] == "object"
+    assert file_schema["additionalProperties"] is False
+
+    assert set(file_schema["required"]) == {
+        "path",
+        "content",
+        "operation",
+    }
+
+    assert file_schema["properties"]["operation"]["enum"] == [
+        "write"
+    ]
