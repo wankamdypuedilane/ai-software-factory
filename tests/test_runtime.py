@@ -1325,6 +1325,19 @@ def test_run_next_agent_uses_retry_context_for_failed_developer(
         provider=provider,
     )
 
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    developer = updated_state["agents"]["developer"]
+    last_result = developer["last_result"]
+
+    assert last_result["implementation_test_failed"] is False
+    assert last_result["failed_task_id"] is None
+    assert last_result["resume_from"] is None
+    assert last_result["test_results"] == []
+    assert developer["status"] == "REVIEW_REQUIRED"
+
     assert agent_name == "developer"
     assert len(provider.prompts) == 2
 

@@ -256,6 +256,13 @@ def run_next_agent(
             )
         )
 
+        if (
+            not implementation_batch.blocked
+            and not implementation_batch.test_failed
+        ):
+            developer_result["failed_task_id"] = None
+            developer_result["implementation_test_failed"] = False
+
         developer_result["implementation_blockers"] = [
             {
                 "task_id": item.task_id,
