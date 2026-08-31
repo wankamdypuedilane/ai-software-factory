@@ -81,6 +81,11 @@ sre_gate:
   reasons: []
   human_approval: false
 
+production_gate:
+  status: NOT_STARTED
+  reasons: []
+  human_approval: false
+
 blockers: []
 
 artifacts: {}
