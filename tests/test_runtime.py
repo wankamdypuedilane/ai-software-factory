@@ -2701,3 +2701,215 @@ def test_run_next_agent_persists_devops_execution(
     assert devops_last_result[
         "rollback_strategy"
     ] == "Redeploy previous stable release."
+
+    assert (
+        updated_state["agents"]["devops"]["status"]
+        == "REVIEW_REQUIRED"
+    )
+
+
+def test_run_next_agent_marks_devops_blocked_when_blockers_exist(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "READY"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "devops": [],
+                }
+            },
+        },
+    )
+
+    class BlockingDevOpsProvider(
+        DevelopmentModelProvider
+    ):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="DevOps orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            raise AssertionError(
+                "Security validation should not run."
+            )
+
+        def validate_devops(
+            self,
+            prompt: str,
+        ) -> DevOpsResult:
+            return DevOpsResult(
+                summary="DevOps validation blocked.",
+                passed=True,
+                blockers=[
+                    "Deployment credentials unavailable.",
+                ],
+                deployment_ready=True,
+                rollback_strategy="Rollback.",
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=BlockingDevOpsProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["devops"]["status"]
+        == "BLOCKED"
+    )
+
+
+def test_run_next_agent_marks_devops_failed_when_not_deployment_ready(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "READY"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "devops": [],
+                }
+            },
+        },
+    )
+
+    class FailingDevOpsProvider(
+        DevelopmentModelProvider
+    ):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="DevOps orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            raise AssertionError(
+                "Security validation should not run."
+            )
+
+        def validate_devops(
+            self,
+            prompt: str,
+        ) -> DevOpsResult:
+            return DevOpsResult(
+                summary="Deployment is not ready.",
+                passed=True,
+                deployment_ready=False,
+                rollback_strategy="",
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=FailingDevOpsProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["devops"]["status"]
+        == "FAILED"
+    )

@@ -583,6 +583,15 @@ def run_next_agent(
             devops_result.rollback_strategy
         )
 
+        if devops_result.blockers:
+            devops_state["status"] = "BLOCKED"
+
+        elif not devops_execution.passed:
+            devops_state["status"] = "FAILED"
+
+        else:
+            devops_state["status"] = "REVIEW_REQUIRED"
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 
