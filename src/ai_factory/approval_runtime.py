@@ -32,6 +32,43 @@ def apply_approval(
         approval_name,
     )
 
+    if approval_name == "production_deployment":
+        production_gate = state.get(
+            "production_gate"
+        )
+
+        if not isinstance(
+            production_gate,
+            dict,
+        ):
+            raise ValueError(
+                "Project state does not contain a valid production_gate."
+            )
+
+        if (
+            production_gate.get("status")
+            != "READY_FOR_REVIEW"
+        ):
+            raise ValueError(
+                "Production deployment cannot be approved: "
+                "the Production Gate is not ready for human approval."
+            )
+
+        state = approve(
+            state,
+            approval_name,
+        )
+
+        production_gate[
+            "human_approval"
+        ] = True
+
+        production_gate[
+            "status"
+        ] = "APPROVED"
+
+        return state
+
     if agent_name is None:
         return approve(
             state,

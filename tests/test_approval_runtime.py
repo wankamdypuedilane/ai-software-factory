@@ -825,3 +825,87 @@ def test_apply_sre_approval_marks_sre_approved() -> None:
         production_gate["human_approval"]
         is False
     )
+
+
+def test_apply_production_deployment_requires_ready_gate() -> None:
+    state = {
+        "approvals": {
+            "sre": True,
+            "production_deployment": False,
+        },
+        "agents": {
+            "sre": {
+                "status": "APPROVED",
+            },
+        },
+        "production_gate": {
+            "status": "NOT_READY",
+            "reasons": [
+                "SRE Gate is not approved.",
+            ],
+            "human_approval": False,
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Production Gate is not ready",
+    ):
+        apply_approval(
+            state,
+            "production_deployment",
+        )
+
+    assert (
+        state["approvals"]["production_deployment"]
+        is False
+    )
+
+    assert (
+        state["production_gate"]["status"]
+        == "NOT_READY"
+    )
+
+    assert (
+        state["production_gate"]["human_approval"]
+        is False
+    )
+
+
+def test_apply_production_deployment_approves_terminal_gate() -> None:
+    state = {
+        "approvals": {
+            "sre": True,
+            "production_deployment": False,
+        },
+        "agents": {
+            "sre": {
+                "status": "APPROVED",
+            },
+        },
+        "production_gate": {
+            "status": "READY_FOR_REVIEW",
+            "reasons": [],
+            "human_approval": False,
+        },
+    }
+
+    updated_state = apply_approval(
+        state,
+        "production_deployment",
+    )
+
+    assert (
+        updated_state["approvals"]["production_deployment"]
+        is True
+    )
+
+    gate = updated_state["production_gate"]
+
+    assert gate["status"] == "APPROVED"
+    assert gate["human_approval"] is True
+
+    assert (
+        updated_state["agents"]["sre"]["status"]
+        == "APPROVED"
+    )
