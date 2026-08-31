@@ -9,6 +9,15 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
+# Pytest temporary directories
+pytest-tmp-*/
+
+# Local manual test projects
+runtimetest/
+
+# Local manual product inputs
+knowledge/inputs/
+
 # Virtual environments
 .venv/
 venv/
