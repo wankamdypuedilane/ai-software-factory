@@ -390,6 +390,56 @@ def run_next_agent(
                 state
             )
 
+    if security_execution is not None:
+        security_state = state["agents"][agent_name]
+        security_last_result = security_state[
+            "last_result"
+        ]
+
+        security_result = security_execution.result
+
+        security_last_result["security_summary"] = (
+            security_result.summary
+        )
+
+        security_last_result[
+            "security_model_passed"
+        ] = security_result.passed
+
+        security_last_result["security_passed"] = (
+            security_execution.passed
+        )
+
+        security_last_result["security_findings"] = [
+            {
+                "id": finding.id,
+                "title": finding.title,
+                "severity": finding.severity,
+                "affected_component": (
+                    finding.affected_component
+                ),
+                "description": finding.description,
+                "impact": finding.impact,
+                "evidence": finding.evidence,
+                "recommended_remediation": (
+                    finding.recommended_remediation
+                ),
+                "priority": finding.priority,
+                "status": finding.status,
+            }
+            for finding in security_result.findings
+        ]
+
+        security_last_result["security_blockers"] = list(
+            security_result.blockers
+        )
+
+        security_last_result[
+            "security_test_results"
+        ] = serialize_test_results(
+            security_execution.test_results
+        )
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 

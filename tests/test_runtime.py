@@ -23,6 +23,10 @@ from ai_factory.qa_result import (
     QADefect,
     QAResult,
 )
+from ai_factory.security_result import (
+    SecurityFinding,
+    SecurityResult,
+)
 
 
 class RuntimeTestProvider(ModelProvider):
@@ -2008,3 +2012,202 @@ def test_run_next_agent_requires_security_capable_provider(
             project_root=tmp_path,
             provider=provider,
         )
+
+
+def test_run_next_agent_persists_security_execution(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    test_file = (
+        tmp_path
+        / "tests"
+        / "test_security_sample.py"
+    )
+
+    test_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    test_file.write_text(
+        "def test_security_sample():\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {
+                    "status": "APPROVED",
+                    "last_result": {
+                        "implemented_files": [
+                            "src/auth.py",
+                        ],
+                    },
+                },
+                "qa": {
+                    "status": "APPROVED",
+                    "last_result": {
+                        "qa_passed": True,
+                        "qa_defects": [],
+                    },
+                },
+                "security": {"status": "READY"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "security": [],
+                }
+            },
+        },
+    )
+
+    class SecurityExecutionProvider(
+        DevelopmentModelProvider
+    ):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Security orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            return SecurityResult(
+                summary="Security validation completed.",
+                passed=False,
+                findings=[
+                    SecurityFinding(
+                        id="SEC-001",
+                        title="Hard-coded secret detected",
+                        severity="High",
+                        affected_component="backend",
+                        description=(
+                            "A secret is committed in source code."
+                        ),
+                        impact="Credential exposure.",
+                        evidence="src/config.py",
+                        recommended_remediation=(
+                            "Move the secret to environment variables."
+                        ),
+                        priority="P1",
+                        status="OPEN",
+                    )
+                ],
+                test_commands=[
+                    "python -m pytest "
+                    "tests/test_security_sample.py -q",
+                ],
+            )
+
+    provider = SecurityExecutionProvider()
+
+    agent_name, _ = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "security"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    security_last_result = updated_state[
+        "agents"
+    ]["security"]["last_result"]
+
+    assert security_last_result[
+        "security_summary"
+    ] == "Security validation completed."
+
+    assert security_last_result[
+        "security_model_passed"
+    ] is False
+
+    assert security_last_result[
+        "security_passed"
+    ] is False
+
+    assert security_last_result[
+        "security_findings"
+    ] == [
+        {
+            "id": "SEC-001",
+            "title": "Hard-coded secret detected",
+            "severity": "High",
+            "affected_component": "backend",
+            "description": (
+                "A secret is committed in source code."
+            ),
+            "impact": "Credential exposure.",
+            "evidence": "src/config.py",
+            "recommended_remediation": (
+                "Move the secret to environment variables."
+            ),
+            "priority": "P1",
+            "status": "OPEN",
+        }
+    ]
+
+    assert security_last_result[
+        "security_blockers"
+    ] == []
+
+    assert len(
+        security_last_result[
+            "security_test_results"
+        ]
+    ) == 1
+
+    assert security_last_result[
+        "security_test_results"
+    ][0]["passed"] is True
