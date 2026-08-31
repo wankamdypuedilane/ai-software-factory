@@ -967,6 +967,79 @@ def test_parse_security_result_rejects_invalid_severity(
         )
 
 
+def test_validate_security_uses_structured_output(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    captured_kwargs = {}
+
+    class FakeResponse:
+        status = "completed"
+        output_text = """
+        {
+            "summary": "Security validation completed.",
+            "passed": true,
+            "findings": [],
+            "test_commands": [
+                "python -m pytest tests/test_security.py -q"
+            ],
+            "blockers": []
+        }
+        """
+
+    def fake_create(**kwargs):
+        captured_kwargs.update(
+            kwargs
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        provider.client.responses,
+        "create",
+        fake_create,
+    )
+
+    result = provider.validate_security(
+        "Validate application security."
+    )
+
+    assert captured_kwargs["model"] == "test-model"
+    assert captured_kwargs["input"] == (
+        "Validate application security."
+    )
+
+    output_format = (
+        captured_kwargs["text"]["format"]
+    )
+
+    assert output_format["type"] == "json_schema"
+    assert output_format["name"] == "security_result"
+    assert output_format["strict"] is True
+
+    assert (
+        output_format["schema"]
+        == build_security_result_schema()
+    )
+
+    assert result.summary == (
+        "Security validation completed."
+    )
+    assert result.passed is True
+    assert result.findings == []
+    assert result.test_commands == [
+        "python -m pytest tests/test_security.py -q"
+    ]
+    assert result.blockers == []
+
+
 def test_parse_qa_result(
     monkeypatch,
 ) -> None:
