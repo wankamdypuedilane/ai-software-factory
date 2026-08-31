@@ -282,3 +282,60 @@ def test_get_execution_blocker_reports_technology_gate_details() -> None:
         "Human approval: pending"
         in blocker
     )
+
+
+def test_get_execution_blocker_reports_development_gate_details() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+            },
+            "ux_ui": {
+                "status": "APPROVED",
+            },
+            "architect": {
+                "status": "APPROVED",
+            },
+            "developer": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+            "security": {
+                "status": "NOT_STARTED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "development_gate": {
+            "status": "READY_FOR_REVIEW",
+            "reasons": [],
+            "human_approval": False,
+        },
+    }
+
+    blocker = get_execution_blocker(
+        state
+    )
+
+    assert blocker is not None
+
+    assert (
+        "Developer is waiting for Development Gate completion."
+        in blocker
+    )
+
+    assert (
+        "Development Gate status: READY_FOR_REVIEW"
+        in blocker
+    )
+
+    assert (
+        "Human approval: pending"
+        in blocker
+    )

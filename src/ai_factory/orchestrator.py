@@ -149,6 +149,39 @@ def get_execution_blocker(
                     details
                 )
 
+            if agent_name == "developer":
+                development_gate = state.get(
+                    "development_gate",
+                    {},
+                )
+
+                status_value = development_gate.get(
+                    "status",
+                    "UNKNOWN",
+                )
+
+                human_approval = development_gate.get(
+                    "human_approval",
+                    False,
+                )
+
+                approval_text = (
+                    "approved"
+                    if human_approval
+                    else "pending"
+                )
+
+                return "\n".join(
+                    [
+                        "Developer is waiting for "
+                        "Development Gate completion.",
+                        "Development Gate status: "
+                        f"{status_value}",
+                        "Human approval: "
+                        f"{approval_text}",
+                    ]
+                )
+
             return (
                 f"Agent '{agent_name}' "
                 f"is waiting for human review."
