@@ -89,3 +89,45 @@ def test_update_production_gate_marks_not_ready() -> None:
     )
 
     assert gate["human_approval"] is False
+
+
+def test_update_production_gate_preserves_approved_gate() -> None:
+    state = {
+        "agents": {
+            "sre": {
+                "status": "APPROVED",
+            },
+        },
+        "approvals": {
+            "sre": True,
+            "production_deployment": True,
+        },
+        "sre_gate": {
+            "status": "APPROVED",
+            "human_approval": True,
+        },
+        "production_gate": {
+            "status": "APPROVED",
+            "reasons": [],
+            "human_approval": True,
+        },
+    }
+
+    updated_state = update_production_gate_from_state(
+        state
+    )
+
+    assert (
+        updated_state["production_gate"]["status"]
+        == "APPROVED"
+    )
+
+    assert (
+        updated_state["production_gate"]["human_approval"]
+        is True
+    )
+
+    assert (
+        updated_state["approvals"]["production_deployment"]
+        is True
+    )

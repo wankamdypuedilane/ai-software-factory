@@ -22,6 +22,12 @@ def update_production_gate_from_state(
             "Project state does not contain a valid production_gate."
         )
 
+    if (
+        gate.get("status") == "APPROVED"
+        and gate.get("human_approval") is True
+    ):
+        return state
+
     evaluation = evaluate_production_gate(
         state
     )
