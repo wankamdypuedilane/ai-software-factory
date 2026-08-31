@@ -714,3 +714,93 @@ def test_apply_devops_approval_activates_sre() -> None:
 
     assert gate["status"] == "APPROVED"
     assert gate["human_approval"] is True
+
+
+def test_apply_sre_approval_requires_ready_gate() -> None:
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": True,
+            "development": True,
+            "qa": True,
+            "security": True,
+            "devops": True,
+            "sre": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "sre": {
+                "status": "REVIEW_REQUIRED",
+            },
+        },
+        "sre_gate": {
+            "status": "NOT_READY",
+            "reasons": [
+                "Observability is not ready.",
+            ],
+            "human_approval": False,
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="SRE Gate is not ready",
+    ):
+        apply_approval(
+            state,
+            "sre",
+        )
+
+    assert state["approvals"]["sre"] is False
+
+    assert (
+        state["agents"]["sre"]["status"]
+        == "REVIEW_REQUIRED"
+    )
+
+
+def test_apply_sre_approval_marks_sre_approved() -> None:
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": True,
+            "development": True,
+            "qa": True,
+            "security": True,
+            "devops": True,
+            "sre": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "sre": {
+                "status": "REVIEW_REQUIRED",
+            },
+        },
+        "sre_gate": {
+            "status": "READY_FOR_REVIEW",
+            "reasons": [],
+            "human_approval": False,
+        },
+    }
+
+    updated_state = apply_approval(
+        state,
+        "sre",
+    )
+
+    assert (
+        updated_state["approvals"]["sre"]
+        is True
+    )
+
+    assert (
+        updated_state["agents"]["sre"]["status"]
+        == "APPROVED"
+    )
+
+    gate = updated_state["sre_gate"]
+
+    assert gate["status"] == "APPROVED"
+    assert gate["human_approval"] is True
