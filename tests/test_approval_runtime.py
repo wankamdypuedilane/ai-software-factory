@@ -40,6 +40,62 @@ def test_apply_product_scope_approval_approves_product() -> None:
     assert updated_state["agents"]["ux_ui"]["status"] == "READY"
 
 
+def test_product_approval_updates_project_phase_to_design() -> None:
+    state = {
+        "project": {
+            "name": "Test Project",
+            "phase": "discovery",
+        },
+        "approvals": {
+            "product_scope": False,
+            "design": False,
+            "architecture": False,
+            "development": False,
+            "qa": False,
+            "security": False,
+            "devops": False,
+            "sre": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "product": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "ux_ui": {
+                "status": "NOT_STARTED",
+            },
+            "architect": {
+                "status": "NOT_STARTED",
+            },
+            "developer": {
+                "status": "NOT_STARTED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+            "security": {
+                "status": "NOT_STARTED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+    }
+
+    updated_state = apply_approval(
+        state,
+        "product_scope",
+    )
+
+    assert (
+        updated_state["project"]["phase"]
+        == "design"
+    )
+
+
 def test_apply_design_approval_approves_ux_ui() -> None:
     state = {
         "approvals": {
@@ -762,6 +818,10 @@ def test_apply_sre_approval_requires_ready_gate() -> None:
 
 def test_apply_sre_approval_marks_sre_approved() -> None:
     state = {
+        "project": {
+            "name": "Test Project",
+            "phase": "sre",
+        },
         "approvals": {
             "product_scope": True,
             "design": True,
@@ -826,6 +886,11 @@ def test_apply_sre_approval_marks_sre_approved() -> None:
         is False
     )
 
+    assert (
+        updated_state["project"]["phase"]
+        == "production"
+    )
+
 
 def test_apply_production_deployment_requires_ready_gate() -> None:
     state = {
@@ -874,6 +939,10 @@ def test_apply_production_deployment_requires_ready_gate() -> None:
 
 def test_apply_production_deployment_approves_terminal_gate() -> None:
     state = {
+        "project": {
+            "name": "Test Project",
+            "phase": "production",
+        },
         "approvals": {
             "sre": True,
             "production_deployment": False,
@@ -908,4 +977,9 @@ def test_apply_production_deployment_approves_terminal_gate() -> None:
     assert (
         updated_state["agents"]["sre"]["status"]
         == "APPROVED"
+    )
+
+    assert (
+        updated_state["project"]["phase"]
+        == "production"
     )

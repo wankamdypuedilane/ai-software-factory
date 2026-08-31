@@ -3,6 +3,9 @@ from typing import Any
 
 from ai_factory.approvals import approve
 from ai_factory.orchestrator import activate_next_agent
+from ai_factory.phases import (
+    get_project_phase,
+)
 from ai_factory.production_gate_runtime import (
     update_production_gate_from_state,
 )
@@ -66,6 +69,18 @@ def apply_approval(
         production_gate[
             "status"
         ] = "APPROVED"
+
+        project = state.get(
+            "project"
+        )
+
+        if isinstance(
+            project,
+            dict,
+        ):
+            project["phase"] = get_project_phase(
+                state
+            )
 
         return state
 
@@ -295,7 +310,21 @@ def apply_approval(
         design_gate["human_approval"] = True
         design_gate["status"] = "APPROVED"
 
-    return activate_next_agent(
+    state = activate_next_agent(
         state,
         agent_name,
     )
+
+    project = state.get(
+        "project"
+    )
+
+    if isinstance(
+        project,
+        dict,
+    ):
+        project["phase"] = get_project_phase(
+            state
+        )
+
+    return state
