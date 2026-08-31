@@ -7,6 +7,10 @@ from ai_factory.agent_result import (
     AgentImplementationRequest,
     AgentResult,
 )
+from ai_factory.devops_result import (
+    DevOpsChange,
+    DevOpsResult,
+)
 from ai_factory.implementation_result import (
     ImplementationFileChange,
     ImplementationResult,
@@ -2512,3 +2516,188 @@ def test_run_next_agent_requires_devops_capable_provider(
             project_root=tmp_path,
             provider=provider,
         )
+
+
+def test_run_next_agent_persists_devops_execution(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    test_file = (
+        tmp_path
+        / "tests"
+        / "test_devops_sample.py"
+    )
+
+    test_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    test_file.write_text(
+        "def test_devops_sample():\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "READY"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "devops": [],
+                }
+            },
+        },
+    )
+
+    class DevOpsExecutionProvider(
+        DevelopmentModelProvider
+    ):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="DevOps orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            raise AssertionError(
+                "Security validation should not run."
+            )
+
+        def validate_devops(
+            self,
+            prompt: str,
+        ) -> DevOpsResult:
+            return DevOpsResult(
+                summary="DevOps automation completed.",
+                passed=True,
+                changes=[
+                    DevOpsChange(
+                        path=".github/workflows/ci.yml",
+                        description="Add CI pipeline.",
+                        category="ci_cd",
+                    )
+                ],
+                test_commands=[
+                    "python -m pytest "
+                    "tests/test_devops_sample.py -q",
+                ],
+                deployment_ready=True,
+                rollback_strategy=(
+                    "Redeploy previous stable release."
+                ),
+            )
+
+    provider = DevOpsExecutionProvider()
+
+    agent_name, _ = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "devops"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    devops_last_result = updated_state[
+        "agents"
+    ]["devops"]["last_result"]
+
+    assert devops_last_result[
+        "devops_summary"
+    ] == "DevOps automation completed."
+
+    assert devops_last_result[
+        "devops_model_passed"
+    ] is True
+
+    assert devops_last_result[
+        "devops_passed"
+    ] is True
+
+    assert devops_last_result[
+        "devops_changes"
+    ] == [
+        {
+            "path": ".github/workflows/ci.yml",
+            "description": "Add CI pipeline.",
+            "category": "ci_cd",
+        }
+    ]
+
+    assert devops_last_result[
+        "devops_blockers"
+    ] == []
+
+    assert len(
+        devops_last_result[
+            "devops_test_results"
+        ]
+    ) == 1
+
+    assert devops_last_result[
+        "devops_test_results"
+    ][0]["passed"] is True
+
+    assert (
+        devops_last_result["deployment_ready"]
+        is True
+    )
+
+    assert devops_last_result[
+        "rollback_strategy"
+    ] == "Redeploy previous stable release."

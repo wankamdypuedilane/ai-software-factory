@@ -536,6 +536,53 @@ def run_next_agent(
                 state
             )
 
+    if devops_execution is not None:
+        devops_state = state["agents"][agent_name]
+        devops_last_result = devops_state[
+            "last_result"
+        ]
+
+        devops_result = devops_execution.result
+
+        devops_last_result["devops_summary"] = (
+            devops_result.summary
+        )
+
+        devops_last_result[
+            "devops_model_passed"
+        ] = devops_result.passed
+
+        devops_last_result["devops_passed"] = (
+            devops_execution.passed
+        )
+
+        devops_last_result["devops_changes"] = [
+            {
+                "path": change.path,
+                "description": change.description,
+                "category": change.category,
+            }
+            for change in devops_result.changes
+        ]
+
+        devops_last_result["devops_blockers"] = list(
+            devops_result.blockers
+        )
+
+        devops_last_result[
+            "devops_test_results"
+        ] = serialize_test_results(
+            devops_execution.test_results
+        )
+
+        devops_last_result["deployment_ready"] = (
+            devops_result.deployment_ready
+        )
+
+        devops_last_result["rollback_strategy"] = (
+            devops_result.rollback_strategy
+        )
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 
