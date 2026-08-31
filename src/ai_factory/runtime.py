@@ -440,6 +440,15 @@ def run_next_agent(
             security_execution.test_results
         )
 
+        if security_result.blockers:
+            security_state["status"] = "BLOCKED"
+
+        elif not security_execution.passed:
+            security_state["status"] = "FAILED"
+
+        else:
+            security_state["status"] = "REVIEW_REQUIRED"
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 

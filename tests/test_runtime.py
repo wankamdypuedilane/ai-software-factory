@@ -2161,6 +2161,11 @@ def test_run_next_agent_persists_security_execution(
         factory_dir / "state.yaml"
     )
 
+    assert (
+        updated_state["agents"]["security"]["status"]
+        == "FAILED"
+    )
+
     security_last_result = updated_state[
         "agents"
     ]["security"]["last_result"]
@@ -2211,3 +2216,190 @@ def test_run_next_agent_persists_security_execution(
     assert security_last_result[
         "security_test_results"
     ][0]["passed"] is True
+
+
+def test_run_next_agent_marks_security_blocked_when_blockers_exist(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "READY"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "security": [],
+                }
+            },
+        },
+    )
+
+    class BlockingSecurityProvider(
+        DevelopmentModelProvider
+    ):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Security orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            return SecurityResult(
+                summary="Security validation blocked.",
+                passed=True,
+                blockers=[
+                    "Security environment unavailable.",
+                ],
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=BlockingSecurityProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["security"]["status"]
+        == "BLOCKED"
+    )
+
+
+def test_run_next_agent_marks_security_review_required_when_validation_passes(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "READY"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "security": [],
+                }
+            },
+        },
+    )
+
+    class PassingSecurityProvider(
+        DevelopmentModelProvider
+    ):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Security orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            return SecurityResult(
+                summary="Security validation passed.",
+                passed=True,
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=PassingSecurityProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["security"]["status"]
+        == "REVIEW_REQUIRED"
+    )
