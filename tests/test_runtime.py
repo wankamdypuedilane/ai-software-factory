@@ -1941,3 +1941,70 @@ def test_run_next_agent_uses_retry_context_for_failed_developer(
 
     assert "Task ID: US-003" in provider.prompts[1]
     assert "## Previous Test Failures" not in provider.prompts[1]
+
+
+def test_run_next_agent_requires_security_capable_provider(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "READY"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "security": [],
+                }
+            },
+        },
+    )
+
+    class RunOnlyProvider(ModelProvider):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Security orchestration completed.",
+            )
+
+    provider = RunOnlyProvider()
+
+    with pytest.raises(
+        ValueError,
+        match="Security-capable provider",
+    ):
+        run_next_agent(
+            project_root=tmp_path,
+            provider=provider,
+        )

@@ -28,12 +28,16 @@ from ai_factory.orchestrator import (
 from ai_factory.providers import (
     ModelProvider,
     QAProvider,
+    SecurityProvider,
 )
 from ai_factory.qa_gate_runtime import (
     update_qa_gate_from_state,
 )
 from ai_factory.result_application import apply_agent_result
 from ai_factory.qa_runtime import run_qa_validation
+from ai_factory.security_runtime import (
+    run_security_validation,
+)
 from ai_factory.state import load_state, save_state
 from ai_factory.test_result_serialization import (
     serialize_test_results,
@@ -125,6 +129,7 @@ def run_next_agent(
     config = context["project"]
 
     qa_execution = None
+    security_execution = None
 
     if agent_name == "qa":
         if not isinstance(
@@ -167,6 +172,77 @@ def run_next_agent(
             project_root=project_root,
             context=qa_context,
             provider=provider,
+        )
+
+    if agent_name == "security":
+        if not isinstance(
+            provider,
+            SecurityProvider,
+        ):
+            raise ValueError(
+                "Security execution requires a "
+                "Security-capable provider."
+            )
+
+        agents = state.get(
+            "agents",
+            {},
+        )
+
+        developer_result = {}
+        qa_result = {}
+
+        if isinstance(agents, dict):
+            developer_state = agents.get(
+                "developer",
+                {},
+            )
+
+            if isinstance(developer_state, dict):
+                stored_developer_result = (
+                    developer_state.get(
+                        "last_result",
+                        {},
+                    )
+                )
+
+                if isinstance(
+                    stored_developer_result,
+                    dict,
+                ):
+                    developer_result = (
+                        stored_developer_result
+                    )
+
+            qa_state = agents.get(
+                "qa",
+                {},
+            )
+
+            if isinstance(qa_state, dict):
+                stored_qa_result = qa_state.get(
+                    "last_result",
+                    {},
+                )
+
+                if isinstance(
+                    stored_qa_result,
+                    dict,
+                ):
+                    qa_result = stored_qa_result
+
+        security_context = dict(context)
+        security_context["developer"] = (
+            developer_result
+        )
+        security_context["qa"] = qa_result
+
+        security_execution = (
+            run_security_validation(
+                project_root=project_root,
+                context=security_context,
+                provider=provider,
+            )
         )
 
     implementation_batch = None
