@@ -2065,6 +2065,11 @@ def test_run_next_agent_persists_security_execution(
                 "devops": {"status": "NOT_STARTED"},
                 "sre": {"status": "NOT_STARTED"},
             },
+            "security_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -2164,6 +2169,22 @@ def test_run_next_agent_persists_security_execution(
     assert (
         updated_state["agents"]["security"]["status"]
         == "FAILED"
+    )
+
+    security_gate = updated_state[
+        "security_gate"
+    ]
+
+    assert security_gate["status"] == "NOT_READY"
+
+    assert (
+        "Security validation did not pass."
+        in security_gate["reasons"]
+    )
+
+    assert (
+        security_gate["human_approval"]
+        is False
     )
 
     security_last_result = updated_state[
@@ -2332,6 +2353,11 @@ def test_run_next_agent_marks_security_review_required_when_validation_passes(
                 "devops": {"status": "NOT_STARTED"},
                 "sre": {"status": "NOT_STARTED"},
             },
+            "security_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -2402,4 +2428,20 @@ def test_run_next_agent_marks_security_review_required_when_validation_passes(
     assert (
         updated_state["agents"]["security"]["status"]
         == "REVIEW_REQUIRED"
+    )
+
+    security_gate = updated_state[
+        "security_gate"
+    ]
+
+    assert (
+        security_gate["status"]
+        == "READY_FOR_REVIEW"
+    )
+
+    assert security_gate["reasons"] == []
+
+    assert (
+        security_gate["human_approval"]
+        is False
     )
