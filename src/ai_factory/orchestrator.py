@@ -52,7 +52,10 @@ def get_execution_blocker(
 
         if status == "REVIEW_REQUIRED":
             if agent_name == "ux_ui":
-                design_gate = state.get("design_gate", {})
+                design_gate = state.get(
+                    "design_gate",
+                    {},
+                )
 
                 status_value = design_gate.get(
                     "status",
@@ -70,8 +73,14 @@ def get_execution_blocker(
                 )
 
                 details = [
-                    "UX/UI is waiting for Design Gate completion.",
-                    f"Design Gate status: {status_value}",
+                    (
+                        "UX/UI is waiting for "
+                        "Design Gate completion."
+                    ),
+                    (
+                        f"Design Gate status: "
+                        f"{status_value}"
+                    ),
                 ]
 
                 for group_name, group_data in groups.items():
@@ -92,13 +101,57 @@ def get_execution_blocker(
                 if external_blockers:
                     details.append(
                         "External blockers: "
-                        + ", ".join(external_blockers)
+                        + ", ".join(
+                            external_blockers
+                        )
                     )
 
-                return "\n".join(details)
+                return "\n".join(
+                    details
+                )
+
+            if agent_name == "architect":
+                technology_gate = state.get(
+                    "technology_gate",
+                    {},
+                )
+
+                status_value = technology_gate.get(
+                    "status",
+                    "UNKNOWN",
+                )
+
+                human_approval = (
+                    "approved"
+                    if technology_gate.get(
+                        "human_approval",
+                        False,
+                    )
+                    else "pending"
+                )
+
+                details = [
+                    (
+                        "Architect is waiting for "
+                        "Technology Gate completion."
+                    ),
+                    (
+                        f"Technology Gate status: "
+                        f"{status_value}"
+                    ),
+                    (
+                        f"Human approval: "
+                        f"{human_approval}"
+                    ),
+                ]
+
+                return "\n".join(
+                    details
+                )
 
             return (
-                f"Agent '{agent_name}' is waiting for human review."
+                f"Agent '{agent_name}' "
+                f"is waiting for human review."
             )
 
     return None
@@ -111,10 +164,13 @@ def activate_next_agent(
     """Activate the agent that follows an approved agent."""
 
     try:
-        current_index = AGENT_ORDER.index(completed_agent)
+        current_index = AGENT_ORDER.index(
+            completed_agent
+        )
     except ValueError as error:
         raise ValueError(
-            f"Unknown agent in execution order: {completed_agent}"
+            f"Unknown agent in execution order: "
+            f"{completed_agent}"
         ) from error
 
     next_index = current_index + 1
@@ -122,15 +178,27 @@ def activate_next_agent(
     if next_index >= len(AGENT_ORDER):
         return state
 
-    next_agent = AGENT_ORDER[next_index]
-    agents = state.get("agents", {})
+    next_agent = AGENT_ORDER[
+        next_index
+    ]
+
+    agents = state.get(
+        "agents",
+        {},
+    )
 
     if next_agent not in agents:
         raise KeyError(
-            f"Unknown next agent: {next_agent}"
+            f"Unknown next agent: "
+            f"{next_agent}"
         )
 
-    if agents[next_agent]["status"] == "NOT_STARTED":
-        agents[next_agent]["status"] = "READY"
+    if (
+        agents[next_agent]["status"]
+        == "NOT_STARTED"
+    ):
+        agents[next_agent][
+            "status"
+        ] = "READY"
 
     return state

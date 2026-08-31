@@ -218,3 +218,67 @@ def test_activate_next_agent_returns_state_for_last_agent() -> None:
     )
 
     assert result == state
+
+
+def test_get_execution_blocker_reports_technology_gate_details() -> None:
+    state = {
+        "agents": {
+            "product": {
+                "status": "APPROVED",
+            },
+            "ux_ui": {
+                "status": "APPROVED",
+            },
+            "architect": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "developer": {
+                "status": "NOT_STARTED",
+            },
+            "qa": {
+                "status": "NOT_STARTED",
+            },
+            "security": {
+                "status": "NOT_STARTED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "technology_gate": {
+            "status": "REVIEW_REQUIRED",
+            "human_approval": False,
+            "proposal": {
+                "components": {
+                    "backend": {
+                        "technology": "Python",
+                        "rationale": "Suitable for the project.",
+                    },
+                },
+            },
+        },
+    }
+
+    blocker = get_execution_blocker(
+        state
+    )
+
+    assert blocker is not None
+
+    assert (
+        "Architect is waiting for Technology Gate completion."
+        in blocker
+    )
+
+    assert (
+        "Technology Gate status: REVIEW_REQUIRED"
+        in blocker
+    )
+
+    assert (
+        "Human approval: pending"
+        in blocker
+    )
