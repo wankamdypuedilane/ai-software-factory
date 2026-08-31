@@ -681,6 +681,57 @@ def run_next_agent(
                 state
             )
 
+    if sre_execution is not None:
+        sre_state = state["agents"][agent_name]
+        sre_last_result = sre_state[
+            "last_result"
+        ]
+
+        sre_result = sre_execution.result
+
+        sre_last_result["sre_summary"] = (
+            sre_result.summary
+        )
+
+        sre_last_result[
+            "sre_model_passed"
+        ] = sre_result.passed
+
+        sre_last_result["sre_passed"] = (
+            sre_execution.passed
+        )
+
+        sre_last_result["sre_findings"] = [
+            {
+                "id": finding.id,
+                "title": finding.title,
+                "severity": finding.severity,
+                "category": finding.category,
+                "description": finding.description,
+                "recommendation": finding.recommendation,
+                "status": finding.status,
+            }
+            for finding in sre_result.findings
+        ]
+
+        sre_last_result["sre_blockers"] = list(
+            sre_result.blockers
+        )
+
+        sre_last_result[
+            "sre_test_results"
+        ] = serialize_test_results(
+            sre_execution.test_results
+        )
+
+        sre_last_result[
+            "observability_ready"
+        ] = sre_result.observability_ready
+
+        sre_last_result[
+            "incident_readiness"
+        ] = sre_result.incident_readiness
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 

@@ -31,6 +31,10 @@ from ai_factory.security_result import (
     SecurityFinding,
     SecurityResult,
 )
+from ai_factory.sre_result import (
+    SREFinding,
+    SREResult,
+)
 
 
 class RuntimeTestProvider(ModelProvider):
@@ -3027,3 +3031,320 @@ def test_run_next_agent_requires_sre_capable_provider(
             project_root=tmp_path,
             provider=provider,
         )
+
+
+def test_run_next_agent_persists_sre_validation_result(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from ai_factory.sre_result import (
+        SREFinding,
+        SREResult,
+    )
+    from ai_factory.sre_runtime import (
+        SREExecution,
+    )
+
+    result = SREResult(
+        summary="SRE validation completed.",
+        passed=True,
+        findings=[
+            SREFinding(
+                id="SRE-001",
+                title="Missing alert",
+                severity="High",
+                category="alerting",
+                description="No alert covers service failure.",
+                recommendation="Add a service failure alert.",
+                status="OPEN",
+            ),
+        ],
+        blockers=[],
+        observability_ready=True,
+        incident_readiness=False,
+    )
+
+    execution = SREExecution(
+        result=result,
+        prompt="SRE prompt",
+        test_results=[],
+    )
+
+    monkeypatch.setattr(
+        "ai_factory.runtime.run_sre_validation",
+        lambda **kwargs: execution,
+    )
+
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "APPROVED"},
+                "sre": {"status": "READY"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "sre": [],
+                }
+            },
+        },
+    )
+
+    class SREExecutionProvider(
+        DevelopmentModelProvider
+    ):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="SRE orchestration completed.",
+            )
+
+    agent_name, _ = run_next_agent(
+        project_root=tmp_path,
+        provider=SREExecutionProvider(),
+    )
+
+    assert agent_name == "sre"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    sre_last_result = updated_state[
+        "agents"
+    ]["sre"]["last_result"]
+
+    assert sre_last_result["sre_summary"] == (
+        "SRE validation completed."
+    )
+    assert sre_last_result["sre_model_passed"] is True
+    assert sre_last_result["sre_passed"] is False
+
+    assert sre_last_result["sre_findings"] == [
+        {
+            "id": "SRE-001",
+            "title": "Missing alert",
+            "severity": "High",
+            "category": "alerting",
+            "description": "No alert covers service failure.",
+            "recommendation": "Add a service failure alert.",
+            "status": "OPEN",
+        }
+    ]
+
+    assert sre_last_result["sre_blockers"] == []
+    assert sre_last_result["sre_test_results"] == []
+    assert sre_last_result["observability_ready"] is True
+    assert sre_last_result["incident_readiness"] is False
+
+
+def test_run_next_agent_persists_sre_execution(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "APPROVED"},
+                "sre": {"status": "READY"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "sre": [],
+                }
+            },
+        },
+    )
+
+    class SREExecutionProvider(
+        DevelopmentModelProvider
+    ):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="SRE orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            raise AssertionError(
+                "Security validation should not run."
+            )
+
+        def validate_devops(
+            self,
+            prompt: str,
+        ) -> DevOpsResult:
+            raise AssertionError(
+                "DevOps validation should not run."
+            )
+
+        def validate_sre(
+            self,
+            prompt: str,
+        ) -> SREResult:
+            return SREResult(
+                summary="SRE validation completed.",
+                passed=True,
+                findings=[
+                    SREFinding(
+                        id="SRE-001",
+                        title="Missing alert",
+                        severity="High",
+                        category="alerting",
+                        description=(
+                            "No alert covers service failure."
+                        ),
+                        recommendation=(
+                            "Add a service failure alert."
+                        ),
+                        status="OPEN",
+                    )
+                ],
+                blockers=[],
+                observability_ready=True,
+                incident_readiness=False,
+            )
+
+    provider = SREExecutionProvider()
+
+    agent_name, _ = run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert agent_name == "sre"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    sre_last_result = updated_state[
+        "agents"
+    ]["sre"]["last_result"]
+
+    assert sre_last_result[
+        "sre_summary"
+    ] == "SRE validation completed."
+
+    assert sre_last_result[
+        "sre_model_passed"
+    ] is True
+
+    assert sre_last_result[
+        "sre_passed"
+    ] is False
+
+    assert sre_last_result[
+        "sre_findings"
+    ] == [
+        {
+            "id": "SRE-001",
+            "title": "Missing alert",
+            "severity": "High",
+            "category": "alerting",
+            "description": (
+                "No alert covers service failure."
+            ),
+            "recommendation": (
+                "Add a service failure alert."
+            ),
+            "status": "OPEN",
+        }
+    ]
+
+    assert sre_last_result[
+        "sre_blockers"
+    ] == []
+
+    assert sre_last_result[
+        "sre_test_results"
+    ] == []
+
+    assert (
+        sre_last_result["observability_ready"]
+        is True
+    )
+
+    assert (
+        sre_last_result["incident_readiness"]
+        is False
+    )
