@@ -23,6 +23,10 @@ from ai_factory.qa_result import (
     QADefect,
     QAResult,
 )
+from ai_factory.security_result import (
+    SecurityFinding,
+    SecurityResult,
+)
 from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import DevelopmentModelProvider
 
@@ -1115,6 +1119,141 @@ class OpenAIProvider(DevelopmentModelProvider):
             summary=summary,
             passed=passed,
             defects=defects,
+            test_commands=test_commands,
+            blockers=blockers,
+        )
+
+    def _parse_security_result(
+        self,
+        raw_output: str,
+    ) -> SecurityResult:
+        """Parse a structured security result."""
+
+        try:
+            data = json.loads(raw_output)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "OpenAI returned invalid security JSON."
+            ) from error
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                "Security result must be an object."
+            )
+
+        summary = data.get("summary")
+        passed = data.get("passed")
+        findings_data = data.get("findings", [])
+        test_commands = data.get("test_commands", [])
+        blockers = data.get("blockers", [])
+
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError(
+                "Security result summary is required."
+            )
+
+        if not isinstance(passed, bool):
+            raise ValueError(
+                "Security result passed must be a boolean."
+            )
+
+        if not isinstance(findings_data, list):
+            raise ValueError(
+                "Security result findings must be a list."
+            )
+
+        if not isinstance(test_commands, list) or not all(
+            isinstance(command, str)
+            for command in test_commands
+        ):
+            raise ValueError(
+                "Security result test_commands must be a list of strings."
+            )
+
+        if not isinstance(blockers, list) or not all(
+            isinstance(blocker, str)
+            for blocker in blockers
+        ):
+            raise ValueError(
+                "Security result blockers must be a list of strings."
+            )
+
+        valid_severities = {
+            "Critical",
+            "High",
+            "Medium",
+            "Low",
+            "Informational",
+        }
+
+        findings: list[SecurityFinding] = []
+
+        for finding_data in findings_data:
+            if not isinstance(finding_data, dict):
+                raise ValueError(
+                    "Invalid security finding."
+                )
+
+            finding_id = finding_data.get("id")
+            title = finding_data.get("title")
+            severity = finding_data.get("severity")
+            affected_component = finding_data.get(
+                "affected_component"
+            )
+            description = finding_data.get("description")
+            impact = finding_data.get("impact")
+            evidence = finding_data.get("evidence")
+            recommended_remediation = finding_data.get(
+                "recommended_remediation"
+            )
+            priority = finding_data.get("priority")
+            status = finding_data.get("status")
+
+            string_fields = {
+                "id": finding_id,
+                "title": title,
+                "affected_component": affected_component,
+                "description": description,
+                "impact": impact,
+                "evidence": evidence,
+                "recommended_remediation": recommended_remediation,
+                "priority": priority,
+                "status": status,
+            }
+
+            for field_name, value in string_fields.items():
+                if (
+                    not isinstance(value, str)
+                    or not value.strip()
+                ):
+                    raise ValueError(
+                        f"Security finding {field_name} is required."
+                    )
+
+            if severity not in valid_severities:
+                raise ValueError(
+                    f"Invalid security finding severity: {severity}"
+                )
+
+            findings.append(
+                SecurityFinding(
+                    id=finding_id,
+                    title=title,
+                    severity=severity,
+                    affected_component=affected_component,
+                    description=description,
+                    impact=impact,
+                    evidence=evidence,
+                    recommended_remediation=recommended_remediation,
+                    priority=priority,
+                    status=status,
+                )
+            )
+
+        return SecurityResult(
+            summary=summary,
+            passed=passed,
+            findings=findings,
             test_commands=test_commands,
             blockers=blockers,
         )

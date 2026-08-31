@@ -829,6 +829,144 @@ def test_build_security_result_schema() -> None:
     ]
 
 
+def test_parse_security_result(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "Security validation completed.",
+        "passed": false,
+        "findings": [
+            {
+                "id": "SEC-001",
+                "title": "Hard-coded secret detected",
+                "severity": "High",
+                "affected_component": "backend",
+                "description": "A secret is committed in source code.",
+                "impact": "Credential exposure.",
+                "evidence": "src/config.py",
+                "recommended_remediation": "Move the secret to environment variables.",
+                "priority": "P1",
+                "status": "OPEN"
+            }
+        ],
+        "test_commands": [
+            "python -m pytest tests/test_security.py -q"
+        ],
+        "blockers": []
+    }
+    """
+
+    result = provider._parse_security_result(
+        raw_output
+    )
+
+    assert result.summary == (
+        "Security validation completed."
+    )
+    assert result.passed is False
+
+    assert len(result.findings) == 1
+
+    finding = result.findings[0]
+
+    assert finding.id == "SEC-001"
+    assert finding.title == (
+        "Hard-coded secret detected"
+    )
+    assert finding.severity == "High"
+    assert finding.affected_component == "backend"
+    assert finding.description == (
+        "A secret is committed in source code."
+    )
+    assert finding.impact == "Credential exposure."
+    assert finding.evidence == "src/config.py"
+    assert finding.recommended_remediation == (
+        "Move the secret to environment variables."
+    )
+    assert finding.priority == "P1"
+    assert finding.status == "OPEN"
+
+    assert result.test_commands == [
+        "python -m pytest tests/test_security.py -q"
+    ]
+    assert result.blockers == []
+
+
+def test_parse_security_result_rejects_invalid_json(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="invalid security JSON",
+    ):
+        provider._parse_security_result(
+            "not-json"
+        )
+
+
+def test_parse_security_result_rejects_invalid_severity(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "Security validation completed.",
+        "passed": false,
+        "findings": [
+            {
+                "id": "SEC-001",
+                "title": "Security issue",
+                "severity": "Extreme",
+                "affected_component": "backend",
+                "description": "Invalid security configuration.",
+                "impact": "Potential compromise.",
+                "evidence": "src/config.py",
+                "recommended_remediation": "Fix configuration.",
+                "priority": "P1",
+                "status": "OPEN"
+            }
+        ],
+        "test_commands": [],
+        "blockers": []
+    }
+    """
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid security finding severity",
+    ):
+        provider._parse_security_result(
+            raw_output
+        )
+
+
 def test_parse_qa_result(
     monkeypatch,
 ) -> None:
