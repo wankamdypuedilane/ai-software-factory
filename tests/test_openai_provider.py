@@ -868,6 +868,121 @@ def test_build_devops_result_schema() -> None:
     }
 
 
+def test_parse_devops_result(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "DevOps automation completed.",
+        "passed": true,
+        "changes": [
+            {
+                "path": ".github/workflows/ci.yml",
+                "description": "Add CI pipeline.",
+                "category": "ci_cd"
+            }
+        ],
+        "test_commands": [
+            "python -m pytest -q"
+        ],
+        "blockers": [],
+        "deployment_ready": true,
+        "rollback_strategy": "Redeploy the previous stable release."
+    }
+    """
+
+    result = provider._parse_devops_result(
+        raw_output
+    )
+
+    assert result.summary == (
+        "DevOps automation completed."
+    )
+
+    assert result.passed is True
+    assert len(result.changes) == 1
+
+    change = result.changes[0]
+
+    assert change.path == ".github/workflows/ci.yml"
+    assert change.description == "Add CI pipeline."
+    assert change.category == "ci_cd"
+
+    assert result.test_commands == [
+        "python -m pytest -q"
+    ]
+
+    assert result.blockers == []
+    assert result.deployment_ready is True
+
+    assert result.rollback_strategy == (
+        "Redeploy the previous stable release."
+    )
+
+
+def test_parse_devops_result_rejects_invalid_json(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="invalid DevOps JSON",
+    ):
+        provider._parse_devops_result(
+            "not-json"
+        )
+
+
+def test_parse_devops_result_rejects_invalid_deployment_ready(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "DevOps automation completed.",
+        "passed": true,
+        "changes": [],
+        "test_commands": [],
+        "blockers": [],
+        "deployment_ready": "yes",
+        "rollback_strategy": "Rollback."
+    }
+    """
+
+    with pytest.raises(
+        ValueError,
+        match="deployment_ready must be a boolean",
+    ):
+        provider._parse_devops_result(
+            raw_output
+        )
+
+
 def test_parse_security_result(
     monkeypatch,
 ) -> None:

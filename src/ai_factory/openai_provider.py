@@ -15,6 +15,10 @@ from ai_factory.agent_result import (
     AgentImplementationRequest,
     AgentResult,
 )
+from ai_factory.devops_result import (
+    DevOpsChange,
+    DevOpsResult,
+)
 from ai_factory.implementation_result import (
     ImplementationFileChange,
     ImplementationResult,
@@ -1383,4 +1387,133 @@ class OpenAIProvider(DevelopmentModelProvider):
             findings=findings,
             test_commands=test_commands,
             blockers=blockers,
+        )
+
+    def _parse_devops_result(
+        self,
+        raw_output: str,
+    ) -> DevOpsResult:
+        """Parse a structured DevOps result."""
+
+        try:
+            data = json.loads(raw_output)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "OpenAI returned invalid DevOps JSON."
+            ) from error
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                "DevOps result must be an object."
+            )
+
+        summary = data.get("summary")
+        passed = data.get("passed")
+        changes_data = data.get("changes", [])
+        test_commands = data.get(
+            "test_commands",
+            [],
+        )
+        blockers = data.get(
+            "blockers",
+            [],
+        )
+        deployment_ready = data.get(
+            "deployment_ready"
+        )
+        rollback_strategy = data.get(
+            "rollback_strategy"
+        )
+
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError(
+                "DevOps result summary is required."
+            )
+
+        if not isinstance(passed, bool):
+            raise ValueError(
+                "DevOps result passed must be a boolean."
+            )
+
+        if not isinstance(changes_data, list):
+            raise ValueError(
+                "DevOps result changes must be a list."
+            )
+
+        if not isinstance(test_commands, list) or not all(
+            isinstance(command, str)
+            for command in test_commands
+        ):
+            raise ValueError(
+                "DevOps result test_commands must be a list of strings."
+            )
+
+        if not isinstance(blockers, list) or not all(
+            isinstance(blocker, str)
+            for blocker in blockers
+        ):
+            raise ValueError(
+                "DevOps result blockers must be a list of strings."
+            )
+
+        if not isinstance(deployment_ready, bool):
+            raise ValueError(
+                "DevOps result deployment_ready must be a boolean."
+            )
+
+        if not isinstance(
+            rollback_strategy,
+            str,
+        ):
+            raise ValueError(
+                "DevOps result rollback_strategy must be a string."
+            )
+
+        changes: list[DevOpsChange] = []
+
+        for change_data in changes_data:
+            if not isinstance(change_data, dict):
+                raise ValueError(
+                    "Invalid DevOps change."
+                )
+
+            path = change_data.get("path")
+            description = change_data.get(
+                "description"
+            )
+            category = change_data.get(
+                "category"
+            )
+
+            string_fields = {
+                "path": path,
+                "description": description,
+                "category": category,
+            }
+
+            for field_name, value in string_fields.items():
+                if (
+                    not isinstance(value, str)
+                    or not value.strip()
+                ):
+                    raise ValueError(
+                        f"DevOps change {field_name} is required."
+                    )
+
+            changes.append(
+                DevOpsChange(
+                    path=path,
+                    description=description,
+                    category=category,
+                )
+            )
+
+        return DevOpsResult(
+            summary=summary,
+            passed=passed,
+            changes=changes,
+            test_commands=test_commands,
+            blockers=blockers,
+            deployment_ready=deployment_ready,
+            rollback_strategy=rollback_strategy,
         )
