@@ -2960,3 +2960,70 @@ def test_run_next_agent_marks_devops_failed_when_not_deployment_ready(
         devops_gate["human_approval"]
         is False
     )
+
+
+def test_run_next_agent_requires_sre_capable_provider(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "APPROVED"},
+                "sre": {"status": "READY"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "sre": [],
+                }
+            },
+        },
+    )
+
+    class RunOnlyProvider(ModelProvider):
+        def run(
+            self,
+            context,
+        ) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="SRE orchestration completed.",
+            )
+
+    provider = RunOnlyProvider()
+
+    with pytest.raises(
+        ValueError,
+        match="SRE-capable provider",
+    ):
+        run_next_agent(
+            project_root=tmp_path,
+            provider=provider,
+        )

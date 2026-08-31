@@ -36,6 +36,7 @@ from ai_factory.providers import (
     ModelProvider,
     QAProvider,
     SecurityProvider,
+    SREProvider,
 )
 from ai_factory.qa_gate_runtime import (
     update_qa_gate_from_state,
@@ -47,6 +48,9 @@ from ai_factory.security_runtime import (
 )
 from ai_factory.security_gate_runtime import (
     update_security_gate_from_state,
+)
+from ai_factory.sre_runtime import (
+    run_sre_validation,
 )
 from ai_factory.state import load_state, save_state
 from ai_factory.test_result_serialization import (
@@ -141,6 +145,7 @@ def run_next_agent(
     qa_execution = None
     security_execution = None
     devops_execution = None
+    sre_execution = None
 
     if agent_name == "qa":
         if not isinstance(
@@ -324,6 +329,79 @@ def run_next_agent(
         devops_execution = run_devops_validation(
             project_root=project_root,
             context=devops_context,
+            provider=provider,
+        )
+
+    if agent_name == "sre":
+        if not isinstance(
+            provider,
+            SREProvider,
+        ):
+            raise ValueError(
+                "SRE execution requires an "
+                "SRE-capable provider."
+            )
+
+        agents = state.get(
+            "agents",
+            {},
+        )
+
+        developer_result = {}
+        qa_result = {}
+        security_result = {}
+        devops_result = {}
+
+        if isinstance(agents, dict):
+            for (
+                source_name,
+                target_name,
+            ) in (
+                ("developer", "developer"),
+                ("qa", "qa"),
+                ("security", "security"),
+                ("devops", "devops"),
+            ):
+                source_state = agents.get(
+                    source_name,
+                    {},
+                )
+
+                if not isinstance(
+                    source_state,
+                    dict,
+                ):
+                    continue
+
+                stored_result = source_state.get(
+                    "last_result",
+                    {},
+                )
+
+                if not isinstance(
+                    stored_result,
+                    dict,
+                ):
+                    continue
+
+                if target_name == "developer":
+                    developer_result = stored_result
+                elif target_name == "qa":
+                    qa_result = stored_result
+                elif target_name == "security":
+                    security_result = stored_result
+                else:
+                    devops_result = stored_result
+
+        sre_context = dict(context)
+        sre_context["developer"] = developer_result
+        sre_context["qa"] = qa_result
+        sre_context["security"] = security_result
+        sre_context["devops"] = devops_result
+
+        sre_execution = run_sre_validation(
+            project_root=project_root,
+            context=sre_context,
             provider=provider,
         )
 
