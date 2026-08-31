@@ -2556,6 +2556,11 @@ def test_run_next_agent_persists_devops_execution(
                 "devops": {"status": "READY"},
                 "sre": {"status": "NOT_STARTED"},
             },
+            "devops_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -2707,6 +2712,22 @@ def test_run_next_agent_persists_devops_execution(
         == "REVIEW_REQUIRED"
     )
 
+    devops_gate = updated_state[
+        "devops_gate"
+    ]
+
+    assert (
+        devops_gate["status"]
+        == "READY_FOR_REVIEW"
+    )
+
+    assert devops_gate["reasons"] == []
+
+    assert (
+        devops_gate["human_approval"]
+        is False
+    )
+
 
 def test_run_next_agent_marks_devops_blocked_when_blockers_exist(
     tmp_path: Path,
@@ -2832,6 +2853,11 @@ def test_run_next_agent_marks_devops_failed_when_not_deployment_ready(
                 "devops": {"status": "READY"},
                 "sre": {"status": "NOT_STARTED"},
             },
+            "devops_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -2912,4 +2938,25 @@ def test_run_next_agent_marks_devops_failed_when_not_deployment_ready(
     assert (
         updated_state["agents"]["devops"]["status"]
         == "FAILED"
+    )
+
+    devops_gate = updated_state[
+        "devops_gate"
+    ]
+
+    assert devops_gate["status"] == "NOT_READY"
+
+    assert (
+        "DevOps validation did not pass."
+        in devops_gate["reasons"]
+    )
+
+    assert (
+        "Deployment is not ready."
+        in devops_gate["reasons"]
+    )
+
+    assert (
+        devops_gate["human_approval"]
+        is False
     )

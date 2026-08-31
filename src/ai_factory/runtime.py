@@ -9,6 +9,9 @@ from ai_factory.design_gate_runtime import (
 from ai_factory.development_gate_runtime import (
     update_development_gate_from_state,
 )
+from ai_factory.devops_gate_runtime import (
+    update_devops_gate_from_state,
+)
 from ai_factory.devops_runtime import (
     run_devops_validation,
 )
@@ -591,6 +594,14 @@ def run_next_agent(
 
         else:
             devops_state["status"] = "REVIEW_REQUIRED"
+
+        if isinstance(
+            state.get("devops_gate"),
+            dict,
+        ):
+            state = update_devops_gate_from_state(
+                state
+            )
 
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
