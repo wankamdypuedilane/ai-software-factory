@@ -2,6 +2,7 @@ import pytest
 
 from ai_factory.openai_provider import (
     OpenAIProvider,
+    build_devops_result_schema,
     build_implementation_result_schema,
     build_qa_result_schema,
     build_security_result_schema,
@@ -827,6 +828,44 @@ def test_build_security_result_schema() -> None:
         "Low",
         "Informational",
     ]
+
+
+def test_build_devops_result_schema() -> None:
+    schema = build_devops_result_schema()
+
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+
+    assert set(schema["required"]) == {
+        "summary",
+        "passed",
+        "changes",
+        "test_commands",
+        "blockers",
+        "deployment_ready",
+        "rollback_strategy",
+    }
+
+    properties = schema["properties"]
+
+    assert "summary" in properties
+    assert "passed" in properties
+    assert "changes" in properties
+    assert "test_commands" in properties
+    assert "blockers" in properties
+    assert "deployment_ready" in properties
+    assert "rollback_strategy" in properties
+
+    change_schema = properties["changes"]["items"]
+
+    assert change_schema["type"] == "object"
+    assert change_schema["additionalProperties"] is False
+
+    assert set(change_schema["required"]) == {
+        "path",
+        "description",
+        "category",
+    }
 
 
 def test_parse_security_result(

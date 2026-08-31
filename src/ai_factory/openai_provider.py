@@ -264,6 +264,73 @@ def build_security_result_schema() -> dict:
     }
 
 
+def build_devops_result_schema() -> dict:
+    """Build the strict JSON schema for DevOps results."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string",
+            },
+            "passed": {
+                "type": "boolean",
+            },
+            "changes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                        },
+                        "description": {
+                            "type": "string",
+                        },
+                        "category": {
+                            "type": "string",
+                        },
+                    },
+                    "required": [
+                        "path",
+                        "description",
+                        "category",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "test_commands": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "blockers": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "deployment_ready": {
+                "type": "boolean",
+            },
+            "rollback_strategy": {
+                "type": "string",
+            },
+        },
+        "required": [
+            "summary",
+            "passed",
+            "changes",
+            "test_commands",
+            "blockers",
+            "deployment_ready",
+            "rollback_strategy",
+        ],
+        "additionalProperties": False,
+    }
+
+
 class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 
