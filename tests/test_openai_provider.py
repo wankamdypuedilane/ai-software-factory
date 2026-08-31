@@ -983,6 +983,91 @@ def test_parse_devops_result_rejects_invalid_deployment_ready(
         )
 
 
+def test_validate_devops_uses_structured_output(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    captured_kwargs = {}
+
+    class FakeResponse:
+        status = "completed"
+        output_text = """
+        {
+            "summary": "DevOps automation completed.",
+            "passed": true,
+            "changes": [
+                {
+                    "path": ".github/workflows/ci.yml",
+                    "description": "Add CI pipeline.",
+                    "category": "ci_cd"
+                }
+            ],
+            "test_commands": [
+                "python -m pytest -q"
+            ],
+            "blockers": [],
+            "deployment_ready": true,
+            "rollback_strategy": "Redeploy the previous stable release."
+        }
+        """
+
+    def fake_create(**kwargs):
+        captured_kwargs.update(
+            kwargs
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        provider.client.responses,
+        "create",
+        fake_create,
+    )
+
+    result = provider.validate_devops(
+        "Validate DevOps automation."
+    )
+
+    assert captured_kwargs["model"] == "test-model"
+    assert captured_kwargs["input"] == (
+        "Validate DevOps automation."
+    )
+
+    output_format = (
+        captured_kwargs["text"]["format"]
+    )
+
+    assert output_format["type"] == "json_schema"
+    assert output_format["name"] == "devops_result"
+    assert output_format["strict"] is True
+
+    assert (
+        output_format["schema"]
+        == build_devops_result_schema()
+    )
+
+    assert result.summary == (
+        "DevOps automation completed."
+    )
+    assert result.passed is True
+    assert len(result.changes) == 1
+    assert result.changes[0].path == (
+        ".github/workflows/ci.yml"
+    )
+    assert result.test_commands == [
+        "python -m pytest -q"
+    ]
+    assert result.blockers == []
+    assert result.deployment_ready is True
+
+
 def test_parse_security_result(
     monkeypatch,
 ) -> None:
