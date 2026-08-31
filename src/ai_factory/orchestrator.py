@@ -12,6 +12,29 @@ AGENT_ORDER = [
     "sre",
 ]
 
+REVIEW_GATE_CONFIG = {
+    "qa": (
+        "qa_gate",
+        "QA",
+        "QA Gate",
+    ),
+    "security": (
+        "security_gate",
+        "Security",
+        "Security Gate",
+    ),
+    "devops": (
+        "devops_gate",
+        "DevOps",
+        "DevOps Gate",
+    ),
+    "sre": (
+        "sre_gate",
+        "SRE",
+        "SRE Gate",
+    ),
+}
+
 
 def get_next_agent(state: dict[str, Any]) -> str | None:
     """Return the next agent that should work based on project state."""
@@ -176,6 +199,49 @@ def get_execution_blocker(
                         "Developer is waiting for "
                         "Development Gate completion.",
                         "Development Gate status: "
+                        f"{status_value}",
+                        "Human approval: "
+                        f"{approval_text}",
+                    ]
+                )
+
+            gate_config = REVIEW_GATE_CONFIG.get(
+                agent_name
+            )
+
+            if gate_config is not None:
+                (
+                    gate_key,
+                    agent_label,
+                    gate_label,
+                ) = gate_config
+
+                gate = state.get(
+                    gate_key,
+                    {},
+                )
+
+                status_value = gate.get(
+                    "status",
+                    "UNKNOWN",
+                )
+
+                human_approval = gate.get(
+                    "human_approval",
+                    False,
+                )
+
+                approval_text = (
+                    "approved"
+                    if human_approval
+                    else "pending"
+                )
+
+                return "\n".join(
+                    [
+                        f"{agent_label} is waiting for "
+                        f"{gate_label} completion.",
+                        f"{gate_label} status: "
                         f"{status_value}",
                         "Human approval: "
                         f"{approval_text}",
