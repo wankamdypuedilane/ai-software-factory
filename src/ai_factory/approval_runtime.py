@@ -13,6 +13,7 @@ APPROVAL_AGENT_MAP = {
     "development": "developer",
     "qa": "qa",
     "security": "security",
+    "devops": "devops",
 }
 
 
@@ -113,6 +114,28 @@ def apply_approval(
                 "the Security Gate is not ready for human approval."
             )
 
+    if approval_name == "devops":
+        devops_gate = state.get(
+            "devops_gate"
+        )
+
+        if not isinstance(
+            devops_gate,
+            dict,
+        ):
+            raise ValueError(
+                "Project state does not contain a valid devops_gate."
+            )
+
+        if (
+            devops_gate.get("status")
+            != "READY_FOR_REVIEW"
+        ):
+            raise ValueError(
+                "DevOps cannot be approved: "
+                "the DevOps Gate is not ready for human approval."
+            )
+
     state = set_agent_status(
         state,
         agent_name,
@@ -124,6 +147,19 @@ def apply_approval(
         state,
         approval_name,
     )
+
+    if approval_name == "devops":
+        devops_gate = state[
+            "devops_gate"
+        ]
+
+        devops_gate[
+            "human_approval"
+        ] = True
+
+        devops_gate[
+            "status"
+        ] = "APPROVED"
 
     if approval_name == "security":
         security_gate = state[
