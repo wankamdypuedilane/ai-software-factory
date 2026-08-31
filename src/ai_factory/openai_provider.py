@@ -166,6 +166,100 @@ def build_qa_result_schema() -> dict:
     }
 
 
+def build_security_result_schema() -> dict:
+    """Build the strict JSON schema for security results."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string",
+            },
+            "passed": {
+                "type": "boolean",
+            },
+            "findings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                        },
+                        "title": {
+                            "type": "string",
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "Critical",
+                                "High",
+                                "Medium",
+                                "Low",
+                                "Informational",
+                            ],
+                        },
+                        "affected_component": {
+                            "type": "string",
+                        },
+                        "description": {
+                            "type": "string",
+                        },
+                        "impact": {
+                            "type": "string",
+                        },
+                        "evidence": {
+                            "type": "string",
+                        },
+                        "recommended_remediation": {
+                            "type": "string",
+                        },
+                        "priority": {
+                            "type": "string",
+                        },
+                        "status": {
+                            "type": "string",
+                        },
+                    },
+                    "required": [
+                        "id",
+                        "title",
+                        "severity",
+                        "affected_component",
+                        "description",
+                        "impact",
+                        "evidence",
+                        "recommended_remediation",
+                        "priority",
+                        "status",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "test_commands": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "blockers": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+        },
+        "required": [
+            "summary",
+            "passed",
+            "findings",
+            "test_commands",
+            "blockers",
+        ],
+        "additionalProperties": False,
+    }
+
+
 class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 

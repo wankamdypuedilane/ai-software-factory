@@ -4,6 +4,7 @@ from ai_factory.openai_provider import (
     OpenAIProvider,
     build_implementation_result_schema,
     build_qa_result_schema,
+    build_security_result_schema,
 )
 
 
@@ -776,6 +777,55 @@ def test_build_qa_result_schema() -> None:
         "High",
         "Medium",
         "Low",
+    ]
+
+
+def test_build_security_result_schema() -> None:
+    schema = build_security_result_schema()
+
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+
+    assert set(schema["required"]) == {
+        "summary",
+        "passed",
+        "findings",
+        "test_commands",
+        "blockers",
+    }
+
+    properties = schema["properties"]
+
+    assert "summary" in properties
+    assert "passed" in properties
+    assert "findings" in properties
+    assert "test_commands" in properties
+    assert "blockers" in properties
+
+    finding_schema = properties["findings"]["items"]
+
+    assert finding_schema["type"] == "object"
+    assert finding_schema["additionalProperties"] is False
+
+    assert set(finding_schema["required"]) == {
+        "id",
+        "title",
+        "severity",
+        "affected_component",
+        "description",
+        "impact",
+        "evidence",
+        "recommended_remediation",
+        "priority",
+        "status",
+    }
+
+    assert finding_schema["properties"]["severity"]["enum"] == [
+        "Critical",
+        "High",
+        "Medium",
+        "Low",
+        "Informational",
     ]
 
 
