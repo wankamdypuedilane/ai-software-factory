@@ -16,6 +16,10 @@ def test_cli_resume_blocked_agent_with_human_input(
     save_state(
         factory_dir / "state.yaml",
         {
+            "project": {
+                "name": "Test Project",
+                "phase": "production",
+            },
             "agents": {
                 "product": {
                     "status": "BLOCKED",
@@ -74,6 +78,7 @@ def test_cli_resume_blocked_agent_with_human_input(
     )
 
     assert state["agents"]["product"]["status"] == "READY"
+    assert state["project"]["phase"] == "discovery"
 
 
 def test_cli_resume_rejects_missing_human_input(

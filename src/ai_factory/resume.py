@@ -2,6 +2,9 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.context_builder import load_agent_input
+from ai_factory.phases import (
+    update_project_phase,
+)
 from ai_factory.transitions import resume_agent
 
 
@@ -24,7 +27,11 @@ def resume_agent_with_input(
             f"Human input is required to resume agent '{agent_name}'."
         )
 
-    return resume_agent(
+    state = resume_agent(
         state,
         agent_name,
+    )
+
+    return update_project_phase(
+        state
     )

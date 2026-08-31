@@ -2,6 +2,9 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.design_gate import is_design_gate_ready
+from ai_factory.phases import (
+    update_project_phase,
+)
 from ai_factory.state import load_state
 from ai_factory.technology_gate import (
     is_technology_gate_approved,
@@ -145,4 +148,6 @@ def retry_agent(
 
     agents[agent_name]["status"] = "READY"
 
-    return state
+    return update_project_phase(
+        state
+    )

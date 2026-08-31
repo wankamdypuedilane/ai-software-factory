@@ -16,6 +16,10 @@ def test_cli_retry_review_required_agent(
     save_state(
         factory_dir / "state.yaml",
         {
+            "project": {
+                "name": "Test Project",
+                "phase": "production",
+            },
             "agents": {
                 "product": {
                     "status": "REVIEW_REQUIRED",
@@ -48,6 +52,7 @@ def test_cli_retry_review_required_agent(
     )
 
     assert state["agents"]["product"]["status"] == "READY"
+    assert state["project"]["phase"] == "discovery"
 
 
 def test_cli_retry_rejects_non_retryable_agent(
