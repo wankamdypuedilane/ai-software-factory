@@ -3348,3 +3348,231 @@ def test_run_next_agent_persists_sre_execution(
         sre_last_result["incident_readiness"]
         is False
     )
+
+    assert (
+        updated_state["agents"]["sre"]["status"]
+        == "FAILED"
+    )
+
+
+def test_run_next_agent_marks_sre_blocked_when_blockers_exist(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "APPROVED"},
+                "sre": {"status": "READY"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "sre": [],
+                }
+            },
+        },
+    )
+
+    class BlockingSREProvider(
+        DevelopmentModelProvider
+    ):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="SRE orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            raise AssertionError(
+                "Security validation should not run."
+            )
+
+        def validate_devops(
+            self,
+            prompt: str,
+        ) -> DevOpsResult:
+            raise AssertionError(
+                "DevOps validation should not run."
+            )
+
+        def validate_sre(
+            self,
+            prompt: str,
+        ) -> SREResult:
+            return SREResult(
+                summary="SRE validation blocked.",
+                passed=True,
+                blockers=[
+                    "Telemetry environment unavailable.",
+                ],
+                observability_ready=True,
+                incident_readiness=True,
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=BlockingSREProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["sre"]["status"]
+        == "BLOCKED"
+    )
+
+
+def test_run_next_agent_marks_sre_review_required_when_validation_passes(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {"name": "Test Project"},
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {"status": "APPROVED"},
+                "qa": {"status": "APPROVED"},
+                "security": {"status": "APPROVED"},
+                "devops": {"status": "APPROVED"},
+                "sre": {"status": "READY"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "sre": [],
+                }
+            },
+        },
+    )
+
+    class PassingSREProvider(
+        DevelopmentModelProvider
+    ):
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="SRE orchestration completed.",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            raise AssertionError(
+                "Developer implementation should not run."
+            )
+
+        def validate_qa(
+            self,
+            prompt: str,
+        ) -> QAResult:
+            raise AssertionError(
+                "QA validation should not run."
+            )
+
+        def validate_security(
+            self,
+            prompt: str,
+        ) -> SecurityResult:
+            raise AssertionError(
+                "Security validation should not run."
+            )
+
+        def validate_devops(
+            self,
+            prompt: str,
+        ) -> DevOpsResult:
+            raise AssertionError(
+                "DevOps validation should not run."
+            )
+
+        def validate_sre(
+            self,
+            prompt: str,
+        ) -> SREResult:
+            return SREResult(
+                summary="SRE validation passed.",
+                passed=True,
+                observability_ready=True,
+                incident_readiness=True,
+            )
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=PassingSREProvider(),
+    )
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["sre"]["status"]
+        == "REVIEW_REQUIRED"
+    )

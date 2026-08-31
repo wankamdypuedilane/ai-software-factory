@@ -732,6 +732,15 @@ def run_next_agent(
             "incident_readiness"
         ] = sre_result.incident_readiness
 
+        if sre_result.blockers:
+            sre_state["status"] = "BLOCKED"
+
+        elif not sre_execution.passed:
+            sre_state["status"] = "FAILED"
+
+        else:
+            sre_state["status"] = "REVIEW_REQUIRED"
+
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]
 
