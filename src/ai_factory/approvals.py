@@ -25,6 +25,12 @@ def approve(
             f"Unknown approval: {approval_name}"
         )
 
+    if approval_name == "production_deployment":
+        raise ValueError(
+            "Production deployment approval must be "
+            "applied through the Production Gate."
+        )
+
     approvals = state.get("approvals")
 
     if not isinstance(approvals, dict):

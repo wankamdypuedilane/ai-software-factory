@@ -57,10 +57,21 @@ def apply_approval(
                 "the Production Gate is not ready for human approval."
             )
 
-        state = approve(
-            state,
-            approval_name,
+        approvals = state.get(
+            "approvals"
         )
+
+        if not isinstance(
+            approvals,
+            dict,
+        ):
+            raise ValueError(
+                "Project state does not contain valid approvals."
+            )
+
+        approvals[
+            "production_deployment"
+        ] = True
 
         production_gate[
             "human_approval"
