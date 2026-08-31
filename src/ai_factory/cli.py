@@ -6,12 +6,18 @@ from ai_factory.design_gate import get_design_gate
 from ai_factory.design_gate_runtime import (
     rebuild_design_gate_from_state,
 )
-from ai_factory.orchestrator import get_next_agent
+from ai_factory.orchestrator import (
+    get_execution_blocker,
+    get_next_agent,
+)
 from ai_factory.project import initialize_project
 from ai_factory.provider_factory import create_provider
 from ai_factory.result_renderer import render_agent_result
 from ai_factory.resume import resume_agent_with_input
-from ai_factory.runtime import run_next_agent
+from ai_factory.runtime import (
+    run_next_agent,
+    run_workflow,
+)
 from ai_factory.state import load_state, save_state
 from ai_factory.status import (
     get_workflow_gates,
@@ -165,6 +171,11 @@ def main() -> None:
         help="Execute the next ready agent",
     )
 
+    subparsers.add_parser(
+        "run-workflow",
+        help="Execute ready agents until the workflow reaches a gate",
+    )
+
     resume_parser = subparsers.add_parser(
         "resume",
         help="Resume a blocked agent after human input is provided",
@@ -301,6 +312,76 @@ def main() -> None:
                     output,
                 )
             )
+
+        except ValueError as error:
+            parser.error(str(error))
+
+    elif args.command == "run-workflow":
+        project_root = Path.cwd()
+
+        state_path = (
+            project_root
+            / ".factory"
+            / "state.yaml"
+        )
+
+        config_path = (
+            project_root
+            / ".factory"
+            / "project.yaml"
+        )
+
+        try:
+            config = load_state(
+                config_path
+            )
+
+            provider = create_provider(
+                config
+            )
+
+            executions = run_workflow(
+                project_root=project_root,
+                provider=provider,
+            )
+
+            for agent_name, output in executions:
+                print(
+                    render_agent_result(
+                        agent_name,
+                        output,
+                    )
+                )
+                print()
+
+            state = load_state(
+                state_path
+            )
+
+            blocker = get_execution_blocker(
+                state
+            )
+
+            print("Workflow stopped.")
+
+            if blocker:
+                print(blocker)
+            elif (
+                state.get(
+                    "project",
+                    {},
+                ).get(
+                    "phase"
+                )
+                == "completed"
+            ):
+                print(
+                    "Project workflow is completed."
+                )
+            else:
+                print(
+                    "No agent is currently ready for execution."
+                )
 
         except ValueError as error:
             parser.error(str(error))
