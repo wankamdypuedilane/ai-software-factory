@@ -1200,13 +1200,99 @@ def test_parse_sre_result_rejects_invalid_observability_ready(
             raw_output
         )
 
-    with pytest.raises(
-        ValueError,
-        match="deployment_ready must be a boolean",
-    ):
-        provider._parse_devops_result(
-            raw_output
+
+def test_validate_sre_uses_structured_output(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    captured_kwargs = {}
+
+    class FakeResponse:
+        status = "completed"
+        output_text = """
+        {
+            "summary": "SRE validation completed.",
+            "passed": true,
+            "findings": [
+                {
+                    "id": "SRE-001",
+                    "title": "Missing health check",
+                    "severity": "High",
+                    "category": "health_check",
+                    "description": "The service exposes no health endpoint.",
+                    "recommendation": "Add a health endpoint.",
+                    "status": "OPEN"
+                }
+            ],
+            "test_commands": [
+                "python -m pytest -q"
+            ],
+            "blockers": [],
+            "observability_ready": true,
+            "incident_readiness": true
+        }
+        """
+
+    def fake_create(**kwargs):
+        captured_kwargs.update(
+            kwargs
         )
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        provider.client.responses,
+        "create",
+        fake_create,
+    )
+
+    result = provider.validate_sre(
+        "Validate reliability and observability."
+    )
+
+    assert captured_kwargs["model"] == "test-model"
+
+    assert captured_kwargs["input"] == (
+        "Validate reliability and observability."
+    )
+
+    output_format = (
+        captured_kwargs["text"]["format"]
+    )
+
+    assert output_format["type"] == "json_schema"
+    assert output_format["name"] == "sre_result"
+    assert output_format["strict"] is True
+
+    assert (
+        output_format["schema"]
+        == build_sre_result_schema()
+    )
+
+    assert result.summary == (
+        "SRE validation completed."
+    )
+
+    assert result.passed is True
+    assert len(result.findings) == 1
+
+    assert result.findings[0].id == "SRE-001"
+    assert result.findings[0].severity == "High"
+
+    assert result.test_commands == [
+        "python -m pytest -q"
+    ]
+
+    assert result.blockers == []
+    assert result.observability_ready is True
+    assert result.incident_readiness is True
 
 
 def test_validate_devops_uses_structured_output(
