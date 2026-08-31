@@ -9,6 +9,9 @@ from ai_factory.implementation_provider import (
     ImplementationProvider,
 )
 from ai_factory.qa_result import QAResult
+from ai_factory.sre_result import (
+    SREResult,
+)
 from ai_factory.security_result import (
     SecurityResult,
 )
@@ -56,12 +59,23 @@ class DevOpsProvider:
         raise NotImplementedError
 
 
+class SREProvider:
+    """Provider capable of performing structured SRE validation."""
+
+    def validate_sre(
+        self,
+        prompt: str,
+    ) -> SREResult:
+        raise NotImplementedError
+
+
 class DevelopmentModelProvider(
     ModelProvider,
     ImplementationProvider,
     QAProvider,
     SecurityProvider,
     DevOpsProvider,
+    SREProvider,
 ):
     """Provider capable of agent and implementation execution."""
 
