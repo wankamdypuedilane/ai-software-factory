@@ -9,6 +9,9 @@ from ai_factory.design_gate_runtime import (
 from ai_factory.development_gate_runtime import (
     update_development_gate_from_state,
 )
+from ai_factory.devops_runtime import (
+    run_devops_validation,
+)
 from ai_factory.implementation_batch import (
     run_implementation_batch,
 )
@@ -26,6 +29,7 @@ from ai_factory.orchestrator import (
     get_next_agent,
 )
 from ai_factory.providers import (
+    DevOpsProvider,
     ModelProvider,
     QAProvider,
     SecurityProvider,
@@ -133,6 +137,7 @@ def run_next_agent(
 
     qa_execution = None
     security_execution = None
+    devops_execution = None
 
     if agent_name == "qa":
         if not isinstance(
@@ -246,6 +251,77 @@ def run_next_agent(
                 context=security_context,
                 provider=provider,
             )
+        )
+
+    if agent_name == "devops":
+        if not isinstance(
+            provider,
+            DevOpsProvider,
+        ):
+            raise ValueError(
+                "DevOps execution requires a "
+                "DevOps-capable provider."
+            )
+
+        agents = state.get(
+            "agents",
+            {},
+        )
+
+        developer_result = {}
+        qa_result = {}
+        security_result = {}
+
+        if isinstance(agents, dict):
+            developer_state = agents.get(
+                "developer",
+                {},
+            )
+            qa_state = agents.get(
+                "qa",
+                {},
+            )
+            security_state = agents.get(
+                "security",
+                {},
+            )
+
+            if isinstance(developer_state, dict):
+                stored_result = developer_state.get(
+                    "last_result",
+                    {},
+                )
+
+                if isinstance(stored_result, dict):
+                    developer_result = stored_result
+
+            if isinstance(qa_state, dict):
+                stored_result = qa_state.get(
+                    "last_result",
+                    {},
+                )
+
+                if isinstance(stored_result, dict):
+                    qa_result = stored_result
+
+            if isinstance(security_state, dict):
+                stored_result = security_state.get(
+                    "last_result",
+                    {},
+                )
+
+                if isinstance(stored_result, dict):
+                    security_result = stored_result
+
+        devops_context = dict(context)
+        devops_context["developer"] = developer_result
+        devops_context["qa"] = qa_result
+        devops_context["security"] = security_result
+
+        devops_execution = run_devops_validation(
+            project_root=project_root,
+            context=devops_context,
+            provider=provider,
         )
 
     implementation_batch = None
