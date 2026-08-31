@@ -335,6 +335,96 @@ def build_devops_result_schema() -> dict:
     }
 
 
+def build_sre_result_schema() -> dict:
+    """Build the strict JSON schema for SRE results."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string",
+            },
+            "passed": {
+                "type": "boolean",
+            },
+            "findings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                        },
+                        "title": {
+                            "type": "string",
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "Critical",
+                                "High",
+                                "Medium",
+                                "Low",
+                                "Informational",
+                            ],
+                        },
+                        "category": {
+                            "type": "string",
+                        },
+                        "description": {
+                            "type": "string",
+                        },
+                        "recommendation": {
+                            "type": "string",
+                        },
+                        "status": {
+                            "type": "string",
+                        },
+                    },
+                    "required": [
+                        "id",
+                        "title",
+                        "severity",
+                        "category",
+                        "description",
+                        "recommendation",
+                        "status",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "test_commands": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "blockers": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "observability_ready": {
+                "type": "boolean",
+            },
+            "incident_readiness": {
+                "type": "boolean",
+            },
+        },
+        "required": [
+            "summary",
+            "passed",
+            "findings",
+            "test_commands",
+            "blockers",
+            "observability_ready",
+            "incident_readiness",
+        ],
+        "additionalProperties": False,
+    }
+
+
 class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 

@@ -5,6 +5,7 @@ from ai_factory.openai_provider import (
     build_devops_result_schema,
     build_implementation_result_schema,
     build_qa_result_schema,
+    build_sre_result_schema,
     build_security_result_schema,
 )
 
@@ -818,6 +819,56 @@ def test_build_security_result_schema() -> None:
         "evidence",
         "recommended_remediation",
         "priority",
+        "status",
+    }
+
+    assert finding_schema["properties"]["severity"]["enum"] == [
+        "Critical",
+        "High",
+        "Medium",
+        "Low",
+        "Informational",
+    ]
+
+
+def test_build_sre_result_schema() -> None:
+    schema = build_sre_result_schema()
+
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+
+    assert set(schema["required"]) == {
+        "summary",
+        "passed",
+        "findings",
+        "test_commands",
+        "blockers",
+        "observability_ready",
+        "incident_readiness",
+    }
+
+    properties = schema["properties"]
+
+    assert "summary" in properties
+    assert "passed" in properties
+    assert "findings" in properties
+    assert "test_commands" in properties
+    assert "blockers" in properties
+    assert "observability_ready" in properties
+    assert "incident_readiness" in properties
+
+    finding_schema = properties["findings"]["items"]
+
+    assert finding_schema["type"] == "object"
+    assert finding_schema["additionalProperties"] is False
+
+    assert set(finding_schema["required"]) == {
+        "id",
+        "title",
+        "severity",
+        "category",
+        "description",
+        "recommendation",
         "status",
     }
 
