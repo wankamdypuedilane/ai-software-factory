@@ -21,7 +21,10 @@ from ai_factory.providers import (
     ModelProvider,
     QAProvider,
 )
-from ai_factory.runtime import run_next_agent
+from ai_factory.runtime import (
+    run_next_agent,
+    run_workflow,
+)
 from ai_factory.state import load_state, save_state
 from ai_factory.qa_result import (
     QADefect,
@@ -3622,4 +3625,85 @@ def test_run_next_agent_marks_sre_review_required_when_validation_passes(
     assert (
         sre_gate["human_approval"]
         is False
+    )
+
+
+def test_run_workflow_stops_when_human_review_is_required(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {
+                    "status": "READY",
+                },
+                "ux_ui": {
+                    "status": "NOT_STARTED",
+                },
+                "architect": {
+                    "status": "NOT_STARTED",
+                },
+                "developer": {
+                    "status": "NOT_STARTED",
+                },
+                "qa": {
+                    "status": "NOT_STARTED",
+                },
+                "security": {
+                    "status": "NOT_STARTED",
+                },
+                "devops": {
+                    "status": "NOT_STARTED",
+                },
+                "sre": {
+                    "status": "NOT_STARTED",
+                },
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "context": {
+                "agents": {
+                    "product": [],
+                }
+            },
+        },
+    )
+
+    provider = RuntimeTestProvider()
+
+    executions = run_workflow(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert len(executions) == 1
+    assert executions[0][0] == "product"
+
+    updated_state = load_state(
+        factory_dir / "state.yaml"
+    )
+
+    assert (
+        updated_state["agents"]["product"]["status"]
+        == "REVIEW_REQUIRED"
+    )
+
+    assert (
+        updated_state["agents"]["ux_ui"]["status"]
+        == "NOT_STARTED"
     )

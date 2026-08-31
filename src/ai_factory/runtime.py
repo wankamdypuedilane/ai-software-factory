@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from ai_factory.agent_result import AgentResult
 from ai_factory.agent_runner import run_agent
 from ai_factory.artifact_runtime import run_artifact_generation
 from ai_factory.context_builder import build_agent_context
@@ -871,3 +872,36 @@ def run_next_agent(
     )
 
     return agent_name, result
+
+
+def run_workflow(
+    project_root: Path,
+    provider: ModelProvider,
+) -> list[tuple[str, AgentResult]]:
+    """Run agents until the workflow reaches a human or execution gate."""
+
+    executions: list[tuple[str, AgentResult]] = []
+
+    while True:
+        state = load_state(
+            project_root / ".factory" / "state.yaml"
+        )
+
+        agent_name = get_next_agent(state)
+
+        if agent_name is None:
+            break
+
+        executed_agent, result = run_next_agent(
+            project_root=project_root,
+            provider=provider,
+        )
+
+        executions.append(
+            (
+                executed_agent,
+                result,
+            )
+        )
+
+    return executions
