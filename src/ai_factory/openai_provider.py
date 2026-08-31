@@ -858,12 +858,13 @@ class OpenAIProvider(DevelopmentModelProvider):
                 "include a technology proposal in metadata using this structure:\n"
                 "{\n"
                 '  "technology_proposal": {\n'
-                '    "components": {\n'
-                '      "component_name": {\n'
+                '    "components": [\n'
+                "      {\n"
+                '        "name": "component_name",\n'
                 '        "technology": "selected technology",\n'
                 '        "rationale": "concise justification"\n'
                 "      }\n"
-                "    }\n"
+                "    ]\n"
                 "  }\n"
                 "}\n"
                 "Include only components that are relevant to the project. "
