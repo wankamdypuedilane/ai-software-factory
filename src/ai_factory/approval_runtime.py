@@ -4,7 +4,7 @@ from typing import Any
 from ai_factory.approvals import approve
 from ai_factory.orchestrator import activate_next_agent
 from ai_factory.phases import (
-    get_project_phase,
+    update_project_phase,
 )
 from ai_factory.production_gate_runtime import (
     update_production_gate_from_state,
@@ -70,17 +70,9 @@ def apply_approval(
             "status"
         ] = "APPROVED"
 
-        project = state.get(
-            "project"
+        state = update_project_phase(
+            state
         )
-
-        if isinstance(
-            project,
-            dict,
-        ):
-            project["phase"] = get_project_phase(
-                state
-            )
 
         return state
 
@@ -315,16 +307,8 @@ def apply_approval(
         agent_name,
     )
 
-    project = state.get(
-        "project"
+    state = update_project_phase(
+        state
     )
-
-    if isinstance(
-        project,
-        dict,
-    ):
-        project["phase"] = get_project_phase(
-            state
-        )
 
     return state

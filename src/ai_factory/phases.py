@@ -41,3 +41,25 @@ def get_project_phase(
         return "production"
 
     return "production"
+
+
+def update_project_phase(
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """Update the persisted project phase from workflow state."""
+
+    project = state.get(
+        "project"
+    )
+
+    if not isinstance(
+        project,
+        dict,
+    ):
+        return state
+
+    project["phase"] = get_project_phase(
+        state
+    )
+
+    return state
