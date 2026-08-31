@@ -52,6 +52,9 @@ from ai_factory.security_gate_runtime import (
 from ai_factory.sre_runtime import (
     run_sre_validation,
 )
+from ai_factory.sre_gate_runtime import (
+    update_sre_gate_from_state,
+)
 from ai_factory.state import load_state, save_state
 from ai_factory.test_result_serialization import (
     serialize_test_results,
@@ -740,6 +743,14 @@ def run_next_agent(
 
         else:
             sre_state["status"] = "REVIEW_REQUIRED"
+
+        if isinstance(
+            state.get("sre_gate"),
+            dict,
+        ):
+            state = update_sre_gate_from_state(
+                state
+            )
 
     if implementation_batch is not None:
         developer_result = state["agents"][agent_name]["last_result"]

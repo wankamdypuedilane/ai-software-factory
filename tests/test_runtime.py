@@ -3189,6 +3189,11 @@ def test_run_next_agent_persists_sre_execution(
                 "devops": {"status": "APPROVED"},
                 "sre": {"status": "READY"},
             },
+            "sre_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -3354,6 +3359,27 @@ def test_run_next_agent_persists_sre_execution(
         == "FAILED"
     )
 
+    sre_gate = updated_state[
+        "sre_gate"
+    ]
+
+    assert sre_gate["status"] == "NOT_READY"
+
+    assert (
+        "SRE validation did not pass."
+        in sre_gate["reasons"]
+    )
+
+    assert (
+        "Incident readiness is not sufficient."
+        in sre_gate["reasons"]
+    )
+
+    assert (
+        sre_gate["human_approval"]
+        is False
+    )
+
 
 def test_run_next_agent_marks_sre_blocked_when_blockers_exist(
     tmp_path: Path,
@@ -3487,6 +3513,11 @@ def test_run_next_agent_marks_sre_review_required_when_validation_passes(
                 "devops": {"status": "APPROVED"},
                 "sre": {"status": "READY"},
             },
+            "sre_gate": {
+                "status": "NOT_STARTED",
+                "reasons": [],
+                "human_approval": False,
+            },
         },
     )
 
@@ -3575,4 +3606,20 @@ def test_run_next_agent_marks_sre_review_required_when_validation_passes(
     assert (
         updated_state["agents"]["sre"]["status"]
         == "REVIEW_REQUIRED"
+    )
+
+    sre_gate = updated_state[
+        "sre_gate"
+    ]
+
+    assert (
+        sre_gate["status"]
+        == "READY_FOR_REVIEW"
+    )
+
+    assert sre_gate["reasons"] == []
+
+    assert (
+        sre_gate["human_approval"]
+        is False
     )
