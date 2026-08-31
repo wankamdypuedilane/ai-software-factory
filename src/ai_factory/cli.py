@@ -13,6 +13,9 @@ from ai_factory.result_renderer import render_agent_result
 from ai_factory.resume import resume_agent_with_input
 from ai_factory.runtime import run_next_agent
 from ai_factory.state import load_state, save_state
+from ai_factory.status import (
+    get_workflow_gates,
+)
 from ai_factory.technology_gate import (
     approve_technology_gate,
     is_technology_gate_approved,
@@ -80,6 +83,33 @@ def show_status(project_root: Path) -> None:
             print("  External blockers: none")
 
         print(f"  Human approval:    {approval_status}")
+
+    workflow_gates = get_workflow_gates(
+        state
+    )
+
+    additional_gates = [
+        gate
+        for gate in workflow_gates
+        if gate["key"] != "design_gate"
+    ]
+
+    if additional_gates:
+        print()
+        print("Workflow Gates:")
+
+        for gate in additional_gates:
+            approval_status = (
+                "approved"
+                if gate["human_approval"]
+                else "pending"
+            )
+
+            print(
+                f"  {gate['name']:<20}"
+                f"{gate['status']:<20}"
+                f"{approval_status}"
+            )
 
     next_agent = get_next_agent(state)
 
