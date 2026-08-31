@@ -38,6 +38,11 @@ approvals:
   product_scope: false
   design: false
   architecture: false
+  development: false
+  qa: false
+  security: false
+  devops: false
+  sre: false
   production_deployment: false
 
 design_gate:
@@ -50,6 +55,31 @@ technology_gate:
   status: NOT_STARTED
   human_approval: false
   proposal: {}
+
+development_gate:
+  status: NOT_STARTED
+  reasons: []
+  human_approval: false
+
+qa_gate:
+  status: NOT_STARTED
+  reasons: []
+  human_approval: false
+
+security_gate:
+  status: NOT_STARTED
+  reasons: []
+  human_approval: false
+
+devops_gate:
+  status: NOT_STARTED
+  reasons: []
+  human_approval: false
+
+sre_gate:
+  status: NOT_STARTED
+  reasons: []
+  human_approval: false
 
 blockers: []
 
