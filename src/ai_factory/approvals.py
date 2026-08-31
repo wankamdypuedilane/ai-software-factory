@@ -7,6 +7,7 @@ VALID_APPROVALS = {
     "architecture",
     "development",
     "qa",
+    "security",
     "production_deployment",
 }
 

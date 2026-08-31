@@ -507,3 +507,106 @@ def test_apply_qa_approval_activates_security() -> None:
 
     assert gate["status"] == "APPROVED"
     assert gate["human_approval"] is True
+
+
+def test_apply_security_approval_requires_ready_gate() -> None:
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": True,
+            "development": True,
+            "qa": True,
+            "security": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "security": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "security_gate": {
+            "status": "NOT_READY",
+            "reasons": [
+                "Security tests failed.",
+            ],
+            "human_approval": False,
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Security Gate is not ready",
+    ):
+        apply_approval(
+            state,
+            "security",
+        )
+
+    assert state["approvals"]["security"] is False
+    assert (
+        state["agents"]["security"]["status"]
+        == "REVIEW_REQUIRED"
+    )
+    assert (
+        state["agents"]["devops"]["status"]
+        == "NOT_STARTED"
+    )
+
+
+def test_apply_security_approval_activates_devops() -> None:
+    state = {
+        "approvals": {
+            "product_scope": True,
+            "design": True,
+            "architecture": True,
+            "development": True,
+            "qa": True,
+            "security": False,
+            "production_deployment": False,
+        },
+        "agents": {
+            "security": {
+                "status": "REVIEW_REQUIRED",
+            },
+            "devops": {
+                "status": "NOT_STARTED",
+            },
+            "sre": {
+                "status": "NOT_STARTED",
+            },
+        },
+        "security_gate": {
+            "status": "READY_FOR_REVIEW",
+            "reasons": [],
+            "human_approval": False,
+        },
+    }
+
+    updated_state = apply_approval(
+        state,
+        "security",
+    )
+
+    assert (
+        updated_state["approvals"]["security"]
+        is True
+    )
+
+    assert (
+        updated_state["agents"]["security"]["status"]
+        == "APPROVED"
+    )
+
+    assert (
+        updated_state["agents"]["devops"]["status"]
+        == "READY"
+    )
+
+    gate = updated_state["security_gate"]
+
+    assert gate["status"] == "APPROVED"
+    assert gate["human_approval"] is True
