@@ -27,6 +27,10 @@ from ai_factory.qa_result import (
     QADefect,
     QAResult,
 )
+from ai_factory.sre_result import (
+    SREFinding,
+    SREResult,
+)
 from ai_factory.security_result import (
     SecurityFinding,
     SecurityResult,
@@ -1666,4 +1670,154 @@ class OpenAIProvider(DevelopmentModelProvider):
             blockers=blockers,
             deployment_ready=deployment_ready,
             rollback_strategy=rollback_strategy,
+        )
+
+    def _parse_sre_result(
+        self,
+        raw_output: str,
+    ) -> SREResult:
+        """Parse a structured SRE result."""
+
+        try:
+            data = json.loads(raw_output)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "OpenAI returned invalid SRE JSON."
+            ) from error
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                "SRE result must be an object."
+            )
+
+        summary = data.get("summary")
+        passed = data.get("passed")
+        findings_data = data.get("findings", [])
+        test_commands = data.get(
+            "test_commands",
+            [],
+        )
+        blockers = data.get(
+            "blockers",
+            [],
+        )
+        observability_ready = data.get(
+            "observability_ready"
+        )
+        incident_readiness = data.get(
+            "incident_readiness"
+        )
+
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError(
+                "SRE result summary is required."
+            )
+
+        if not isinstance(passed, bool):
+            raise ValueError(
+                "SRE result passed must be a boolean."
+            )
+
+        if not isinstance(findings_data, list):
+            raise ValueError(
+                "SRE result findings must be a list."
+            )
+
+        if not isinstance(test_commands, list) or not all(
+            isinstance(command, str)
+            for command in test_commands
+        ):
+            raise ValueError(
+                "SRE result test_commands must be a list of strings."
+            )
+
+        if not isinstance(blockers, list) or not all(
+            isinstance(blocker, str)
+            for blocker in blockers
+        ):
+            raise ValueError(
+                "SRE result blockers must be a list of strings."
+            )
+
+        if not isinstance(observability_ready, bool):
+            raise ValueError(
+                "SRE result observability_ready must be a boolean."
+            )
+
+        if not isinstance(incident_readiness, bool):
+            raise ValueError(
+                "SRE result incident_readiness must be a boolean."
+            )
+
+        valid_severities = {
+            "Critical",
+            "High",
+            "Medium",
+            "Low",
+            "Informational",
+        }
+
+        findings: list[SREFinding] = []
+
+        for finding_data in findings_data:
+            if not isinstance(finding_data, dict):
+                raise ValueError(
+                    "Invalid SRE finding."
+                )
+
+            finding_id = finding_data.get("id")
+            title = finding_data.get("title")
+            severity = finding_data.get("severity")
+            category = finding_data.get("category")
+            description = finding_data.get(
+                "description"
+            )
+            recommendation = finding_data.get(
+                "recommendation"
+            )
+            status = finding_data.get("status")
+
+            string_fields = {
+                "id": finding_id,
+                "title": title,
+                "category": category,
+                "description": description,
+                "recommendation": recommendation,
+                "status": status,
+            }
+
+            for field_name, value in string_fields.items():
+                if (
+                    not isinstance(value, str)
+                    or not value.strip()
+                ):
+                    raise ValueError(
+                        f"SRE finding {field_name} is required."
+                    )
+
+            if severity not in valid_severities:
+                raise ValueError(
+                    f"Invalid SRE finding severity: {severity}"
+                )
+
+            findings.append(
+                SREFinding(
+                    id=finding_id,
+                    title=title,
+                    severity=severity,
+                    category=category,
+                    description=description,
+                    recommendation=recommendation,
+                    status=status,
+                )
+            )
+
+        return SREResult(
+            summary=summary,
+            passed=passed,
+            findings=findings,
+            test_commands=test_commands,
+            blockers=blockers,
+            observability_ready=observability_ready,
+            incident_readiness=incident_readiness,
         )

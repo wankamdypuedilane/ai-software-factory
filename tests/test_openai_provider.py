@@ -1034,6 +1034,181 @@ def test_parse_devops_result_rejects_invalid_deployment_ready(
         )
 
 
+def test_parse_sre_result(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "SRE validation completed.",
+        "passed": true,
+        "findings": [
+            {
+                "id": "SRE-001",
+                "title": "Missing health check",
+                "severity": "High",
+                "category": "health_check",
+                "description": "The service exposes no health endpoint.",
+                "recommendation": "Add a health endpoint.",
+                "status": "OPEN"
+            }
+        ],
+        "test_commands": [
+            "python -m pytest -q"
+        ],
+        "blockers": [],
+        "observability_ready": true,
+        "incident_readiness": true
+    }
+    """
+
+    result = provider._parse_sre_result(
+        raw_output
+    )
+
+    assert result.summary == (
+        "SRE validation completed."
+    )
+
+    assert result.passed is True
+    assert len(result.findings) == 1
+
+    finding = result.findings[0]
+
+    assert finding.id == "SRE-001"
+    assert finding.title == "Missing health check"
+    assert finding.severity == "High"
+    assert finding.category == "health_check"
+    assert finding.description == (
+        "The service exposes no health endpoint."
+    )
+    assert finding.recommendation == (
+        "Add a health endpoint."
+    )
+    assert finding.status == "OPEN"
+
+    assert result.test_commands == [
+        "python -m pytest -q"
+    ]
+
+    assert result.blockers == []
+    assert result.observability_ready is True
+    assert result.incident_readiness is True
+
+
+def test_parse_sre_result_rejects_invalid_json(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="invalid SRE JSON",
+    ):
+        provider._parse_sre_result(
+            "not-json"
+        )
+
+
+def test_parse_sre_result_rejects_invalid_severity(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "SRE validation completed.",
+        "passed": false,
+        "findings": [
+            {
+                "id": "SRE-001",
+                "title": "Reliability issue",
+                "severity": "Extreme",
+                "category": "reliability",
+                "description": "Invalid reliability state.",
+                "recommendation": "Fix reliability controls.",
+                "status": "OPEN"
+            }
+        ],
+        "test_commands": [],
+        "blockers": [],
+        "observability_ready": false,
+        "incident_readiness": false
+    }
+    """
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid SRE finding severity",
+    ):
+        provider._parse_sre_result(
+            raw_output
+        )
+
+
+def test_parse_sre_result_rejects_invalid_observability_ready(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    raw_output = """
+    {
+        "summary": "SRE validation completed.",
+        "passed": true,
+        "findings": [],
+        "test_commands": [],
+        "blockers": [],
+        "observability_ready": "yes",
+        "incident_readiness": true
+    }
+    """
+
+    with pytest.raises(
+        ValueError,
+        match="observability_ready must be a boolean",
+    ):
+        provider._parse_sre_result(
+            raw_output
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="deployment_ready must be a boolean",
+    ):
+        provider._parse_devops_result(
+            raw_output
+        )
+
+
 def test_validate_devops_uses_structured_output(
     monkeypatch,
 ) -> None:
