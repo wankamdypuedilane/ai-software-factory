@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ai_factory.agent_result import AgentResult
+from ai_factory.devops_result import (
+    DevOpsResult,
+)
 from ai_factory.implementation_provider import (
     ImplementationProvider,
 )
@@ -43,11 +46,22 @@ class SecurityProvider:
         raise NotImplementedError
 
 
+class DevOpsProvider:
+    """Provider capable of performing structured DevOps validation."""
+
+    def validate_devops(
+        self,
+        prompt: str,
+    ) -> DevOpsResult:
+        raise NotImplementedError
+
+
 class DevelopmentModelProvider(
     ModelProvider,
     ImplementationProvider,
     QAProvider,
     SecurityProvider,
+    DevOpsProvider,
 ):
     """Provider capable of agent and implementation execution."""
 
