@@ -3,6 +3,9 @@ from typing import Any
 
 from ai_factory.approvals import approve
 from ai_factory.orchestrator import activate_next_agent
+from ai_factory.production_gate_runtime import (
+    update_production_gate_from_state,
+)
 from ai_factory.transitions import set_agent_status
 
 
@@ -183,6 +186,14 @@ def apply_approval(
         sre_gate[
             "status"
         ] = "APPROVED"
+
+        if isinstance(
+            state.get("production_gate"),
+            dict,
+        ):
+            state = update_production_gate_from_state(
+                state
+            )
 
     if approval_name == "devops":
         devops_gate = state[

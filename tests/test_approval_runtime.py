@@ -783,6 +783,11 @@ def test_apply_sre_approval_marks_sre_approved() -> None:
             "reasons": [],
             "human_approval": False,
         },
+        "production_gate": {
+            "status": "NOT_STARTED",
+            "reasons": [],
+            "human_approval": False,
+        },
     }
 
     updated_state = apply_approval(
@@ -804,3 +809,19 @@ def test_apply_sre_approval_marks_sre_approved() -> None:
 
     assert gate["status"] == "APPROVED"
     assert gate["human_approval"] is True
+
+    production_gate = updated_state[
+        "production_gate"
+    ]
+
+    assert (
+        production_gate["status"]
+        == "READY_FOR_REVIEW"
+    )
+
+    assert production_gate["reasons"] == []
+
+    assert (
+        production_gate["human_approval"]
+        is False
+    )
