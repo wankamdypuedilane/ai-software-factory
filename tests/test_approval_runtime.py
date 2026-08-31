@@ -981,5 +981,7 @@ def test_apply_production_deployment_approves_terminal_gate() -> None:
 
     assert (
         updated_state["project"]["phase"]
-        == "production"
+        == "completed"
     )
+
+

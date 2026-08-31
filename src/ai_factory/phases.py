@@ -29,16 +29,36 @@ def get_project_phase(
         if agent.get("status") != "APPROVED":
             return phase
 
+    approvals = state.get(
+        "approvals",
+        {},
+    )
+
     production_gate = state.get(
         "production_gate",
         {},
     )
 
     if (
-        isinstance(production_gate, dict)
-        and production_gate.get("status") == "APPROVED"
+        isinstance(approvals, dict)
+        and approvals.get(
+            "production_deployment"
+        )
+        is True
+        and isinstance(
+            production_gate,
+            dict,
+        )
+        and production_gate.get(
+            "status"
+        )
+        == "APPROVED"
+        and production_gate.get(
+            "human_approval"
+        )
+        is True
     ):
-        return "production"
+        return "completed"
 
     return "production"
 

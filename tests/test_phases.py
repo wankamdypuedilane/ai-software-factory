@@ -89,3 +89,27 @@ def test_project_phase_is_production_after_all_agents_are_approved() -> None:
     }
 
     assert get_project_phase(state) == "production"
+
+
+def test_project_phase_is_completed_after_production_approval() -> None:
+    state = {
+        "agents": {
+            "product": {"status": "APPROVED"},
+            "ux_ui": {"status": "APPROVED"},
+            "architect": {"status": "APPROVED"},
+            "developer": {"status": "APPROVED"},
+            "qa": {"status": "APPROVED"},
+            "security": {"status": "APPROVED"},
+            "devops": {"status": "APPROVED"},
+            "sre": {"status": "APPROVED"},
+        },
+        "approvals": {
+            "production_deployment": True,
+        },
+        "production_gate": {
+            "status": "APPROVED",
+            "human_approval": True,
+        },
+    }
+
+    assert get_project_phase(state) == "completed"
