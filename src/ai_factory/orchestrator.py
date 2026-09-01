@@ -253,6 +253,48 @@ def get_execution_blocker(
                 f"is waiting for human review."
             )
 
+    production_gate = state.get(
+        "production_gate",
+        {},
+    )
+
+    if isinstance(
+        production_gate,
+        dict,
+    ):
+        production_status = production_gate.get(
+            "status"
+        )
+
+        if production_status == "READY_FOR_REVIEW":
+            human_approval = production_gate.get(
+                "human_approval",
+                False,
+            )
+
+            approval_text = (
+                "approved"
+                if human_approval
+                else "pending"
+            )
+
+            return "\n".join(
+                [
+                    (
+                        "Production deployment is waiting for "
+                        "Production Gate completion."
+                    ),
+                    (
+                        "Production Gate status: "
+                        f"{production_status}"
+                    ),
+                    (
+                        "Human approval: "
+                        f"{approval_text}"
+                    ),
+                ]
+            )
+
     return None
 
 

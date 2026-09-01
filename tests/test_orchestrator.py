@@ -447,3 +447,48 @@ def test_get_execution_blocker_reports_sre_gate_details() -> None:
     assert "SRE is waiting for SRE Gate completion." in blocker
     assert "SRE Gate status: READY_FOR_REVIEW" in blocker
     assert "Human approval: pending" in blocker
+
+
+def test_get_execution_blocker_reports_production_gate_details() -> None:
+    state = {
+        "project": {
+            "name": "Test Project",
+            "phase": "production",
+        },
+        "agents": {
+            "product": {"status": "APPROVED"},
+            "ux_ui": {"status": "APPROVED"},
+            "architect": {"status": "APPROVED"},
+            "developer": {"status": "APPROVED"},
+            "qa": {"status": "APPROVED"},
+            "security": {"status": "APPROVED"},
+            "devops": {"status": "APPROVED"},
+            "sre": {"status": "APPROVED"},
+        },
+        "production_gate": {
+            "status": "READY_FOR_REVIEW",
+            "reasons": [],
+            "human_approval": False,
+        },
+    }
+
+    blocker = get_execution_blocker(
+        state
+    )
+
+    assert blocker is not None
+
+    assert (
+        "Production deployment is waiting for Production Gate completion."
+        in blocker
+    )
+
+    assert (
+        "Production Gate status: READY_FOR_REVIEW"
+        in blocker
+    )
+
+    assert (
+        "Human approval: pending"
+        in blocker
+    )
