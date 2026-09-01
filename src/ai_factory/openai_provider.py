@@ -834,6 +834,13 @@ class OpenAIProvider(DevelopmentModelProvider):
             + '      "purpose": "what this artifact must document or produce"\n'
             + "    }\n"
             + "  ],\n"
+            + '  "implementation_requests": [\n'
+            + "    {\n"
+            + '      "id": "implementation-task-id",\n'
+            + '      "title": "short implementation task title",\n'
+            + '      "purpose": "what should be implemented"\n'
+            + "    }\n"
+            + "  ],\n"
             + '  "questions": [],\n'
             + '  "blockers": [],\n'
             + '  "handoff": null,\n'
@@ -1158,7 +1165,10 @@ class OpenAIProvider(DevelopmentModelProvider):
                             "type": "object",
                             "properties": {
                                 "technology_proposal": {
-                                    "type": "object",
+                                    "type": [
+                                        "object",
+                                        "null",
+                                    ],
                                     "properties": {
                                         "components": {
                                             "type": "array",
@@ -1882,3 +1892,4 @@ class OpenAIProvider(DevelopmentModelProvider):
             observability_ready=observability_ready,
             incident_readiness=incident_readiness,
         )
+

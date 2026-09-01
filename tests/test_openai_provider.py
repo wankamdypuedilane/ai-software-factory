@@ -2004,6 +2004,121 @@ def test_openai_provider_implement_rejects_incomplete_response(
         )
 
 
+def test_openai_provider_run_prompt_includes_implementation_requests(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    captured = {}
+
+    def fake_execute(prompt: str) -> str:
+        captured["prompt"] = prompt
+
+        return """
+{
+  "status": "COMPLETED",
+  "summary": "Product discovery completed.",
+  "artifacts": [],
+  "artifact_requests": [],
+  "implementation_requests": [],
+  "questions": [],
+  "blockers": [],
+  "handoff": null,
+  "metadata": {
+    "technology_proposal": null
+  }
+}
+"""
+
+    monkeypatch.setattr(
+        provider,
+        "_execute",
+        fake_execute,
+    )
+
+    provider.run(
+        {
+            "agent_name": "product",
+            "contract": "Product contract",
+            "project": {},
+            "state": {},
+            "artifacts": {},
+        }
+    )
+
+    assert (
+        '"implementation_requests": ['
+        in captured["prompt"]
+    )
+
+
+def test_openai_provider_agent_schema_allows_null_technology_proposal(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = """
+{
+  "status": "COMPLETED",
+  "summary": "Completed.",
+  "artifacts": [],
+  "artifact_requests": [],
+  "implementation_requests": [],
+  "questions": [],
+  "blockers": [],
+  "handoff": null,
+  "metadata": {
+    "technology_proposal": null
+  }
+}
+"""
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    provider._execute(
+        "prepared prompt"
+    )
+
+    schema = captured[
+        "text"
+    ]["format"]["schema"]
+
+    technology_proposal_schema = schema[
+        "properties"
+    ]["metadata"]["properties"][
+        "technology_proposal"
+    ]
+
+    assert "null" in technology_proposal_schema["type"]
+
+
 def test_openai_provider_implement_handles_rate_limit(
     monkeypatch,
 ) -> None:
