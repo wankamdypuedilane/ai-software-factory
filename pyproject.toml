@@ -36,3 +36,14 @@ packages = [
 dev = [
     "pytest>=8.0"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".*",
+    "build",
+    "dist",
+    "projects",
+    "pytest-tmp-*",
+    "*.egg-info",
+]
