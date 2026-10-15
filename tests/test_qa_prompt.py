@@ -72,3 +72,50 @@ def test_build_qa_prompt_handles_empty_context() -> None:
     assert "## Acceptance Criteria" in prompt
     assert "## Developer Implementation" in prompt
     assert "## Implemented Files" in prompt
+
+
+def test_build_qa_prompt_includes_artifacts_sources_and_executed_tests() -> None:
+    prompt = build_qa_prompt(
+        {
+            "project": {"name": "Todo CLI"},
+            "artifacts": {
+                "knowledge/project/requirements.md": "IDs are never reused.",
+                "design/ux-ui/screen-specs.md": "Empty list prints No todos.",
+            },
+            "human_input": "Errors go to stderr.",
+            "implemented_sources": {
+                "todo/service.py": "def complete_todo(data, raw_id): ...",
+            },
+            "executed_tests": [
+                {
+                    "command": "python -m pytest",
+                    "returncode": 0,
+                    "passed": True,
+                    "stdout_tail": "46 passed",
+                },
+            ],
+            "developer": {"implemented_files": ["todo/service.py"]},
+        }
+    )
+
+    assert "## Approved Artifacts" in prompt
+    assert "IDs are never reused." in prompt
+    assert "Empty list prints No todos." in prompt
+    assert "Errors go to stderr." in prompt
+    assert "def complete_todo(data, raw_id)" in prompt
+    assert "46 passed" in prompt
+    assert "Never report that you cannot execute tests" in prompt
+
+
+def test_build_qa_prompt_budgets_large_artifacts() -> None:
+    prompt = build_qa_prompt(
+        {
+            "artifacts": {
+                f"doc-{index}.md": "x" * 9000
+                for index in range(10)
+            },
+        }
+    )
+
+    assert "[truncated:" in prompt
+    assert "[further artifacts omitted" in prompt

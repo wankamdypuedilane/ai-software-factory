@@ -1,11 +1,29 @@
 from typing import Any
 
 from ai_factory.agent_result import AgentResult
+from ai_factory.result_policy import (
+    RESULT_STATUS_TO_AGENT_STATUS,
+)
 from ai_factory.blocker_contract import (
     blocker_messages,
     blocking_blockers,
     coerce_blockers,
 )
+
+
+def _awaits_human_answers(
+    result_status: Any,
+) -> bool:
+    """Whether the UX/UI result stopped to ask the human something.
+
+    Deliverables written by an agent that is still waiting for answers are a
+    draft: a real run showed the gate at READY_FOR_REVIEW, open for
+    approval, while the agent itself was BLOCKED on four questions.
+    """
+
+    return (
+        RESULT_STATUS_TO_AGENT_STATUS.get(result_status) == "BLOCKED"
+    )
 
 
 def _unresolved_messages(
@@ -70,6 +88,7 @@ def update_design_gate_from_result(
         requested_total > 0
         and generated_total == requested_total
         and not unresolved
+        and not _awaits_human_answers(result.status)
     ):
         gate["status"] = "READY_FOR_REVIEW"
     else:
@@ -159,6 +178,7 @@ def rebuild_design_gate_from_state(
         requested_total > 0
         and generated_total == requested_total
         and not unresolved
+        and not _awaits_human_answers(last_result.get("status"))
     )
 
     approvals = state.get(

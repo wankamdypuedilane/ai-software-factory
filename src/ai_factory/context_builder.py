@@ -30,6 +30,7 @@ UPSTREAM_ARTIFACT_PREFIXES = {
         "workflows/backlog/",
         "design/ux-ui/screen-specs.md",
         "knowledge/architecture/api.md",
+        "knowledge/architecture/interfaces.md",
     ),
     "security": (
         "knowledge/project/requirements.md",
@@ -44,6 +45,19 @@ UPSTREAM_ARTIFACT_PREFIXES = {
         "knowledge/architecture/",
         "knowledge/decisions/",
     ),
+}
+
+
+# Upstream agents whose artifacts each agent depends on. Used to keep
+# artifacts that an agent wrote outside the conventional locations.
+UPSTREAM_PRODUCERS = {
+    "ux_ui": ("product",),
+    "architect": ("product", "ux_ui"),
+    "developer": ("product", "ux_ui", "architect"),
+    "qa": ("product", "ux_ui", "architect"),
+    "security": ("product", "architect"),
+    "devops": ("architect",),
+    "sre": ("architect",),
 }
 
 
@@ -62,11 +76,30 @@ def trim_artifact_content(
     )
 
 
+def _is_conventional_artifact_path(
+    relative_path: str,
+) -> bool:
+    """Return whether a path lies in a location the prefix map knows."""
+
+    return any(
+        relative_path.startswith(prefix)
+        for prefixes in UPSTREAM_ARTIFACT_PREFIXES.values()
+        for prefix in prefixes
+    )
+
+
 def is_artifact_relevant_to_agent(
     relative_path: str,
     agent_name: str,
+    producer_agent: str | None = None,
 ) -> bool:
-    """Return whether an upstream artifact is relevant to an agent."""
+    """Return whether an upstream artifact is relevant to an agent.
+
+    Artifacts in conventional locations are filtered by prefix. An artifact
+    written somewhere the prefix map does not know is still passed on when
+    its producer is a direct upstream source of this agent: dropping it
+    silently would hide an approved decision from every later phase.
+    """
 
     prefixes = UPSTREAM_ARTIFACT_PREFIXES.get(
         agent_name
@@ -75,9 +108,16 @@ def is_artifact_relevant_to_agent(
     if prefixes is None:
         return True
 
-    return any(
+    if any(
         relative_path.startswith(prefix)
         for prefix in prefixes
+    ):
+        return True
+
+    return (
+        producer_agent is not None
+        and producer_agent in UPSTREAM_PRODUCERS.get(agent_name, ())
+        and not _is_conventional_artifact_path(relative_path)
     )
 
 
@@ -203,6 +243,7 @@ def load_upstream_generated_artifacts(
             if not is_artifact_relevant_to_agent(
                 relative_path,
                 agent_name,
+                producer_agent=upstream_agent,
             ):
                 continue
 

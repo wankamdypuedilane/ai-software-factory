@@ -1,6 +1,10 @@
 import json
 from typing import Any
 
+from ai_factory.validation_context import (
+    VALIDATION_EXECUTION_RULES,
+)
+
 
 def build_security_prompt(
     context: dict[str, Any],
@@ -12,6 +16,11 @@ def build_security_prompt(
         indent=2,
         ensure_ascii=False,
         default=str,
+    )
+
+    rules = "\n".join(
+        f"- {rule}"
+        for rule in VALIDATION_EXECUTION_RULES
     )
 
     return f"""# Security Validation
@@ -85,6 +94,14 @@ software does not satisfy the required security quality bar.
 
 Report blockers when security validation cannot be completed because
 required evidence or environment capabilities are unavailable.
+
+## Execution and Scope
+
+{rules}
+
+The context below includes `implemented_sources` (the current source of
+every implemented file) and `executed_tests` (the Developer's executed test
+commands and their results).
 
 ## Project Context
 

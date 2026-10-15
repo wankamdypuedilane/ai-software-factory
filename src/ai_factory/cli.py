@@ -76,6 +76,27 @@ def _exit_on_provider_failure(
     raise SystemExit(PROVIDER_FAILURE_EXIT_CODE)
 
 
+# A run that stops on a workflow rule (a non-converging Developer, an
+# incomplete response, an exhausted budget) is not a typing mistake either.
+# It is reported without the usage banner, with its own exit code.
+WORKFLOW_STOP_EXIT_CODE = 3
+
+
+def _exit_on_workflow_stop(
+    error: ValueError,
+) -> None:
+    print(
+        f"Workflow stopped: {error}",
+        file=sys.stderr,
+    )
+    print(
+        "Run 'ai-factory status' to see where the workflow is.",
+        file=sys.stderr,
+    )
+
+    raise SystemExit(WORKFLOW_STOP_EXIT_CODE)
+
+
 def show_status(project_root: Path) -> None:
     """Display the current Factory project status."""
 
@@ -441,7 +462,7 @@ def main() -> None:
             _exit_on_provider_failure(error)
 
         except ValueError as error:
-            parser.error(str(error))
+            _exit_on_workflow_stop(error)
 
     elif args.command == "run-workflow":
         project_root = Path.cwd()
@@ -517,7 +538,7 @@ def main() -> None:
             _exit_on_provider_failure(error)
 
         except ValueError as error:
-            parser.error(str(error))
+            _exit_on_workflow_stop(error)
 
     elif args.command == "resume":
         project_root = Path.cwd()

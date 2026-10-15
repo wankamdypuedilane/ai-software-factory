@@ -191,9 +191,24 @@ knowledge/architecture/
 ├── system-design.md
 ├── database.md
 ├── api.md
+├── interfaces.md
 ├── infrastructure.md
 └── security.md
 ```
+
+`interfaces.md` is the binding contract between implementation units. The
+Developer implements the project as several independent units, each in its
+own model call, so any internal interface left open is decided differently
+by each unit. For every module the implementation will contain, it states:
+
+* The module path.
+* Every public function or class, with exact parameter names and types.
+* The exact return value of each function.
+* Every exception it raises, and when.
+* Which module is allowed to print, read files, or exit the process.
+
+Keep it short and exact: signatures, not prose. Every implementation unit
+receives this file in full and must not deviate from it.
 
 Architecture diagrams should be created when they significantly improve understanding.
 

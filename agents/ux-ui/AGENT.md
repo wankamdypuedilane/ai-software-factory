@@ -58,6 +58,19 @@ The UX/UI Agent receives:
 
 The agent must not invent major product requirements that have not been approved.
 
+## Outputs
+
+Every UX/UI artifact must be written under:
+
+```text
+design/ux-ui/
+```
+
+Downstream agents (Architect, Developer, QA) read UX/UI decisions from this
+directory. For a command-line or text-only product, write the interaction
+contract (commands, output formats, messages, exit codes) to
+`design/ux-ui/screen-specs.md` so that QA receives it as well.
+
 ---
 
 # 5. Design Process

@@ -133,3 +133,80 @@ def test_update_design_gate_marks_partial_when_blockers_exist() -> None:
     assert gate["external_blockers"] == [
         "External design review required."
     ]
+
+
+def test_update_design_gate_stays_partial_while_ux_ui_needs_input() -> None:
+    state = {
+        "design_gate": {
+            "status": "NOT_STARTED",
+            "groups": {},
+            "external_blockers": [],
+            "human_approval": False,
+        }
+    }
+
+    result = AgentResult(
+        status="NEEDS_INPUT",
+        summary="Command syntax is unspecified.",
+        artifact_requests=[
+            AgentArtifactRequest(
+                path="design/ux-ui/screen-specs.md",
+                purpose="Document the CLI interaction contract.",
+            ),
+        ],
+        questions=["What syntax should each command use?"],
+        blockers=[],
+    )
+
+    updated_state = update_design_gate_from_result(
+        state=state,
+        result=result,
+        generated_paths=[
+            "design/ux-ui/screen-specs.md",
+        ],
+    )
+
+    gate = updated_state["design_gate"]
+
+    assert gate["status"] == "PARTIAL"
+    assert gate["groups"]["deliverables"] == {
+        "approved": 1,
+        "total": 1,
+    }
+
+
+def test_rebuild_design_gate_stays_partial_while_ux_ui_needs_input() -> None:
+    from ai_factory.design_gate_runtime import (
+        rebuild_design_gate_from_state,
+    )
+
+    state = {
+        "agents": {
+            "ux_ui": {
+                "last_result": {
+                    "status": "NEEDS_INPUT",
+                    "artifact_requests": [
+                        {
+                            "path": "design/ux-ui/screen-specs.md",
+                            "purpose": "CLI contract.",
+                        },
+                    ],
+                    "generated_artifacts": [
+                        "design/ux-ui/screen-specs.md",
+                    ],
+                    "blockers": [],
+                },
+            },
+        },
+        "approvals": {"design": False},
+        "design_gate": {
+            "status": "READY_FOR_REVIEW",
+            "groups": {},
+            "external_blockers": [],
+            "human_approval": False,
+        },
+    }
+
+    gate = rebuild_design_gate_from_state(state)["design_gate"]
+
+    assert gate["status"] == "PARTIAL"
