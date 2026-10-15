@@ -2531,3 +2531,155 @@ def test_openai_provider_implement_handles_rate_limit(
         provider.implement(
             "implementation prompt"
         )
+
+
+def capture_openai_client(
+    monkeypatch,
+) -> dict:
+    captured: dict = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.OpenAI",
+        FakeOpenAI,
+    )
+
+    return captured
+
+
+def test_openai_provider_defaults_client_configuration(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    captured = capture_openai_client(monkeypatch)
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "base_url": None,
+            "api_key_env": None,
+        },
+    )
+
+    assert captured == {
+        "api_key": "test-key",
+    }
+    assert provider.api_key_env == "OPENAI_API_KEY"
+    assert provider.base_url is None
+
+
+def test_openai_provider_passes_base_url_to_client(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    captured = capture_openai_client(monkeypatch)
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "base_url": "http://localhost:11434/v1",
+        },
+    )
+
+    assert captured == {
+        "api_key": "test-key",
+        "base_url": "http://localhost:11434/v1",
+    }
+    assert provider.base_url == "http://localhost:11434/v1"
+
+
+def test_openai_provider_reads_key_from_configured_env(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(
+        "OPENAI_API_KEY",
+        raising=False,
+    )
+    monkeypatch.setenv(
+        "CUSTOM_LLM_KEY",
+        "custom-key",
+    )
+
+    captured = capture_openai_client(monkeypatch)
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "api_key_env": "CUSTOM_LLM_KEY",
+        },
+    )
+
+    assert captured["api_key"] == "custom-key"
+    assert provider.api_key == "custom-key"
+    assert provider.api_key_env == "CUSTOM_LLM_KEY"
+
+
+def test_openai_provider_names_missing_configured_key_env(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "ignored-key",
+    )
+    monkeypatch.delenv(
+        "CUSTOM_LLM_KEY",
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.load_dotenv",
+        lambda *args, **kwargs: False,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="CUSTOM_LLM_KEY environment variable is required",
+    ):
+        OpenAIProvider(
+            model="test-model",
+            settings={
+                "api_key_env": "CUSTOM_LLM_KEY",
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "settings, message",
+    [
+        ({"api_key_env": ""}, "api_key_env"),
+        ({"api_key_env": 42}, "api_key_env"),
+        ({"base_url": "  "}, "base_url"),
+        ({"base_url": 8080}, "base_url"),
+    ],
+)
+def test_openai_provider_rejects_invalid_client_settings(
+    monkeypatch,
+    settings,
+    message,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    capture_openai_client(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match=message,
+    ):
+        OpenAIProvider(
+            model="test-model",
+            settings=settings,
+        )

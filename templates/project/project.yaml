@@ -55,6 +55,10 @@ ai:
   settings:
     temperature: null
     max_output_tokens: null
+    # OpenAI-compatible endpoint; null keeps the SDK default.
+    base_url: null
+    # Environment variable holding the API key; null means OPENAI_API_KEY.
+    api_key_env: null
 
 inputs:
   directory: knowledge/inputs
