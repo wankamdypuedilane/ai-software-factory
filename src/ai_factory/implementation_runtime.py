@@ -56,6 +56,7 @@ from ai_factory.validation_evidence import (
     missing_validation_evidence,
 )
 from ai_factory.validation_target import (
+    extract_validation_targets,
     find_invalid_validation_targets,
 )
 from ai_factory.workspace_transaction import (
@@ -294,6 +295,84 @@ def _build_test_scope_correction(
 
     corrections.extend(
         [
+            "Keep the rest of the implementation unchanged.",
+            "Do not report this correction as a blocker.",
+        ]
+    )
+
+    return corrections
+
+
+def _normalize_relative_path(
+    path: str,
+) -> str:
+    normalized = path.strip().replace("\\", "/")
+
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+
+    return normalized
+
+
+def find_unwritten_validation_targets(
+    project_root: Path,
+    result: ImplementationResult,
+) -> list[str]:
+    """Return declared test targets that neither exist nor are written.
+
+    Checked before anything is applied, so a unit that validates itself with
+    a test file a later unit will create is corrected for the price of one
+    response instead of failing a whole Developer cycle: pytest reports such
+    a command with exit code 4, which the outcome model cannot tell apart
+    from a defect in the code under test.
+    """
+
+    written = {
+        _normalize_relative_path(file_change.path)
+        for file_change in result.files
+    }
+
+    missing: list[str] = []
+
+    for command in result.tests:
+        for target in extract_validation_targets(command):
+            normalized = _normalize_relative_path(target)
+
+            if normalized in written:
+                continue
+
+            if (project_root / normalized).exists():
+                continue
+
+            if normalized not in missing:
+                missing.append(normalized)
+
+    return missing
+
+
+def build_missing_test_target_correction(
+    task_id: str,
+    missing_targets: list[str],
+) -> list[str]:
+    """Ask the Developer to validate only with tests that will exist."""
+
+    corrections = [
+        "The previous response was rejected by the Factory runtime and was not applied.",
+        f"Return a corrected response for task {task_id}.",
+    ]
+
+    corrections.extend(
+        f"Declared test file does not exist and is not written by this response: {target}"
+        for target in missing_targets
+    )
+
+    corrections.extend(
+        [
+            "A task may only validate itself with test files that already exist "
+            "in the workspace or that it returns in its own files.",
+            "Either add the missing test file to this response, or validate with "
+            "an existing test file that covers this task.",
+            "Never reference a test file that a later task will create.",
             "Keep the rest of the implementation unchanged.",
             "Do not report this correction as a blocker.",
         ]
@@ -749,6 +828,21 @@ def run_implementation_task(
                 task_id=task.id,
                 result=result,
                 reason=missing_validation,
+            )
+
+            continue
+
+        missing_targets = find_unwritten_validation_targets(
+            project_root=project_root,
+            result=result,
+        )
+
+        # On the last attempt the response is applied as it is: the
+        # post-execution target check still refuses it, with its evidence.
+        if missing_targets and not is_last_attempt:
+            policy_corrections = build_missing_test_target_correction(
+                task_id=task.id,
+                missing_targets=missing_targets,
             )
 
             continue

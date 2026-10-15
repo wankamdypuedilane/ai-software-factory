@@ -643,3 +643,21 @@ def test_build_implementation_prompt_renders_policy_corrections() -> None:
     ) < prompt.index(
         "## Project Configuration"
     )
+
+
+def test_implementation_prompt_requires_existing_or_written_test_files() -> None:
+    from ai_factory.implementation_prompt import build_implementation_prompt
+    from ai_factory.implementation_request import ImplementationTask
+
+    prompt = build_implementation_prompt(
+        task=ImplementationTask(
+            agent_name="developer",
+            id="todo-cli",
+            title="CLI",
+            purpose="Implement the CLI.",
+        ),
+        context={},
+    )
+
+    assert "python -m pytest <test-file>" in prompt
+    assert "a later task will create" in prompt

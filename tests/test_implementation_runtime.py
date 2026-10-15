@@ -1715,6 +1715,15 @@ def _task_repository_result(
     )
 
 
+def _write_existing_test_file(
+    root: Path,
+    relative_path: str,
+) -> None:
+    path = root / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("// existing test\n", encoding="utf-8")
+
+
 def _stub_passing_test_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2164,6 +2173,13 @@ def test_narrow_test_unit_captures_a_baseline(
         "src/app/api/v1/tasks/discovery-api.test.ts"
     )
 
+    # The declared target has to exist: a unit may only validate itself
+    # with a test that is present or that it writes.
+    _write_existing_test_file(
+        tmp_path,
+        "src/app/api/v1/tasks/discovery-api.test.ts",
+    )
+
     provider = SequencedImplementationProvider(
         [
             ImplementationResult(
@@ -2318,6 +2334,11 @@ def test_run_implementation_task_propagates_project_identity(
         purpose="Implement the cart repository.",
     )
 
+    _write_existing_test_file(
+        tmp_path,
+        "src/modules/cart/cart-repository.test.ts",
+    )
+
     provider = SequencedImplementationProvider(
         [
             ImplementationResult(
@@ -2351,3 +2372,157 @@ def test_run_implementation_task_propagates_project_identity(
         "shop",
         "lite",
     )
+
+
+def _cli_task() -> ImplementationTask:
+    return ImplementationTask(
+        agent_name="developer",
+        id="todo-cli",
+        title="CLI entry point",
+        purpose="Implement the command-line entry point.",
+    )
+
+
+def _cli_result(
+    tests: list[str],
+    with_test_file: bool = False,
+) -> ImplementationResult:
+    files = [
+        ImplementationFileChange(
+            path="todo/__main__.py",
+            content="print('todo')\n",
+        ),
+    ]
+
+    if with_test_file:
+        files.append(
+            ImplementationFileChange(
+                path="tests/test_cli.py",
+                content="def test_cli():\n    assert True\n",
+            )
+        )
+
+    return ImplementationResult(
+        task_id="todo-cli",
+        summary="CLI implemented.",
+        files=files,
+        tests=tests,
+    )
+
+
+def test_task_referencing_a_test_file_it_does_not_write_is_corrected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = SequencedImplementationProvider(
+        [
+            _cli_result(
+                tests=["python -m pytest tests/test_cli_entry_point.py"],
+            ),
+            _cli_result(
+                tests=["python -m pytest tests/test_cli.py"],
+                with_test_file=True,
+            ),
+        ]
+    )
+
+    _stub_passing_test_command(monkeypatch)
+
+    execution = run_implementation_task(
+        project_root=tmp_path,
+        task=_cli_task(),
+        context={},
+        provider=provider,
+    )
+
+    assert len(provider.prompts) == 2
+    assert "## Required Corrections" in provider.prompts[1]
+    assert (
+        "tests/test_cli_entry_point.py"
+        in provider.prompts[1]
+    )
+    assert execution.execution_succeeded
+    assert (tmp_path / "tests" / "test_cli.py").is_file()
+
+
+def test_task_writing_its_own_test_file_is_not_corrected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = SequencedImplementationProvider(
+        [
+            _cli_result(
+                tests=["python -m pytest ./tests/test_cli.py::test_cli"],
+                with_test_file=True,
+            ),
+        ]
+    )
+
+    _stub_passing_test_command(monkeypatch)
+
+    execution = run_implementation_task(
+        project_root=tmp_path,
+        task=_cli_task(),
+        context={},
+        provider=provider,
+    )
+
+    assert len(provider.prompts) == 1
+    assert execution.execution_succeeded
+
+
+def test_task_validating_with_an_existing_test_file_is_not_corrected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing = tmp_path / "tests" / "test_service.py"
+    existing.parent.mkdir(parents=True)
+    existing.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+
+    provider = SequencedImplementationProvider(
+        [
+            _cli_result(
+                tests=["python -m pytest tests/test_service.py"],
+            ),
+        ]
+    )
+
+    _stub_passing_test_command(monkeypatch)
+
+    run_implementation_task(
+        project_root=tmp_path,
+        task=_cli_task(),
+        context={},
+        provider=provider,
+    )
+
+    assert len(provider.prompts) == 1
+
+
+def test_missing_test_target_on_last_attempt_still_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    missing = _cli_result(
+        tests=["python -m pytest tests/test_cli_entry_point.py"],
+    )
+
+    provider = SequencedImplementationProvider(
+        [missing, missing],
+    )
+
+    _stub_passing_test_command(monkeypatch)
+
+    execution = run_implementation_task(
+        project_root=tmp_path,
+        task=_cli_task(),
+        context={},
+        provider=provider,
+    )
+
+    assert len(provider.prompts) == 2
+    assert execution.invalid_validation_targets == [
+        "tests/test_cli_entry_point.py",
+    ]
+    assert not execution.execution_succeeded
+    assert not (tmp_path / "todo" / "__main__.py").exists()
