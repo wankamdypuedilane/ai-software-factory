@@ -91,6 +91,7 @@ from ai_factory.security_result import (
 )
 from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import DevelopmentModelProvider
+from ai_factory.resources import get_source_checkout_dir
 
 
 def classify_openai_error(
@@ -553,15 +554,16 @@ class OpenAIProvider(DevelopmentModelProvider):
         self.model = model
         self.settings = settings or {}
 
-        env_path = (
-            Path(__file__).resolve().parents[2]
-            / ".env"
-        )
-
-        load_dotenv(
-            dotenv_path=env_path,
-            override=False,
-        )
+        # Project-local .env first, then the Factory checkout's .env.
+        for env_path in (
+            Path.cwd() / ".env",
+            get_source_checkout_dir() / ".env",
+        ):
+            if env_path.is_file():
+                load_dotenv(
+                    dotenv_path=env_path,
+                    override=False,
+                )
 
         api_key = os.getenv("OPENAI_API_KEY")
 

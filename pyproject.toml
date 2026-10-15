@@ -17,10 +17,20 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+packages = [
+    "ai_factory",
+    "ai_factory._data.agents",
+    "ai_factory._data.templates",
+]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools.package-dir]
+"" = "src"
+"ai_factory._data.agents" = "agents"
+"ai_factory._data.templates" = "templates"
+
+[tool.setuptools.package-data]
+"ai_factory._data.agents" = ["**/*.md"]
+"ai_factory._data.templates" = ["**/*.yaml", "**/*.md"]
 
 [project.optional-dependencies]
 dev = [

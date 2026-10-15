@@ -1,5 +1,7 @@
 from pathlib import Path
+from typing import Any
 
+from ai_factory.resources import get_templates_dir
 from ai_factory.state import load_state, save_state
 
 
@@ -17,11 +19,7 @@ def initialize_project(project_name: str, target_dir: Path) -> Path:
 
     factory_dir.mkdir(parents=True)
 
-    templates_root = (
-        Path(__file__).resolve().parents[2]
-        / "templates"
-        / "project"
-    )
+    templates_root = get_templates_dir() / "project"
 
     # Initialize workflow state
     state_template_path = templates_root / "state.yaml"
@@ -42,4 +40,39 @@ def initialize_project(project_name: str, target_dir: Path) -> Path:
     project_config_path = factory_dir / "project.yaml"
     save_state(project_config_path, project_config)
 
+    # Initialize the human input the Product agent starts from
+    product_input_path = get_product_input_path(
+        project_root,
+        project_config,
+    )
+    product_input_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    product_input_path.write_text(
+        (templates_root / "inputs" / "product.md").read_text(
+            encoding="utf-8",
+        ),
+        encoding="utf-8",
+    )
+
     return project_root
+
+
+def get_product_input_path(
+    project_root: Path,
+    project_config: dict[str, Any],
+) -> Path:
+    """Return the path of the Product agent input file."""
+
+    inputs_config = project_config.get("inputs", {})
+
+    input_directory = "knowledge/inputs"
+
+    if isinstance(inputs_config, dict):
+        input_directory = inputs_config.get(
+            "directory",
+            input_directory,
+        )
+
+    return project_root / input_directory / "product.md"

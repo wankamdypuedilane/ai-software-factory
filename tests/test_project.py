@@ -104,3 +104,22 @@ def test_initialize_project_creates_project_configuration(tmp_path):
     assert config["ai"]["model"] is None
     assert config["ai"]["settings"]["temperature"] is None
     assert config["ai"]["settings"]["max_output_tokens"] is None
+
+
+def test_initialize_project_creates_product_input(tmp_path: Path) -> None:
+    project_root = initialize_project(
+        project_name="RideFlow",
+        target_dir=tmp_path,
+    )
+
+    product_input = (
+        project_root
+        / "knowledge"
+        / "inputs"
+        / "product.md"
+    )
+
+    assert product_input.exists()
+    assert "# Product Input" in product_input.read_text(
+        encoding="utf-8",
+    )
