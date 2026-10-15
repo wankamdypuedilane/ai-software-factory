@@ -20,40 +20,6 @@ from ai_factory.blocker_contract import (
     normalize_blockers,
     validate_declared_blockers,
 )
-from ai_factory.provider_errors import (
-    ProviderErrorKind,
-    ProviderExecutionError,
-    ProviderResultError,
-    kind_for_status_code,
-)
-
-
-def parses_provider_result(stage: str):
-    """Attribute every parsing refusal of `stage` to the provider result.
-
-    A response that does not satisfy the structural contract is a provider
-    result failure, not an operator mistake and not a Factory crash. Naming
-    it keeps the CLI able to report it as such, and keeps the failure
-    recoverable: parsing happens before anything is applied.
-    """
-
-    def decorator(function):
-        @functools.wraps(function)
-        def wrapper(self, raw_output):
-            try:
-                return function(self, raw_output)
-            except (ProviderResultError, ProviderExecutionError):
-                raise
-            except ValueError as error:
-                raise ProviderResultError(
-                    stage=stage,
-                    message=str(error),
-                ) from error
-
-        return wrapper
-
-    return decorator
-
 from ai_factory.agent_result import (
     AgentArtifact,
     AgentArtifactRequest,
@@ -92,6 +58,39 @@ from ai_factory.security_result import (
 from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import DevelopmentModelProvider
 from ai_factory.resources import get_source_checkout_dir
+from ai_factory.provider_errors import (
+    ProviderErrorKind,
+    ProviderExecutionError,
+    ProviderResultError,
+    kind_for_status_code,
+)
+
+
+def parses_provider_result(stage: str):
+    """Attribute every parsing refusal of `stage` to the provider result.
+
+    A response that does not satisfy the structural contract is a provider
+    result failure, not an operator mistake and not a Factory crash. Naming
+    it keeps the CLI able to report it as such, and keeps the failure
+    recoverable: parsing happens before anything is applied.
+    """
+
+    def decorator(function):
+        @functools.wraps(function)
+        def wrapper(self, raw_output):
+            try:
+                return function(self, raw_output)
+            except (ProviderResultError, ProviderExecutionError):
+                raise
+            except ValueError as error:
+                raise ProviderResultError(
+                    stage=stage,
+                    message=str(error),
+                ) from error
+
+        return wrapper
+
+    return decorator
 
 
 def classify_openai_error(
@@ -538,6 +537,240 @@ def build_sre_result_schema() -> dict:
     }
 
 
+def build_agent_result_schema() -> dict:
+    """Build the strict JSON schema for agent results."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "status": {
+                "type": "string",
+                "enum": [
+                    "COMPLETED",
+                    "NEEDS_INPUT",
+                    "BLOCKED",
+                    "REVIEW_REQUIRED",
+                ],
+            },
+            "summary": {
+                "type": "string",
+            },
+            "artifacts": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                        },
+                        "content": {
+                            "type": "string",
+                        },
+                    },
+                    "required": [
+                        "path",
+                        "content",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "artifact_requests": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                        },
+                        "purpose": {
+                            "type": "string",
+                        },
+                    },
+                    "required": [
+                        "path",
+                        "purpose",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "implementation_requests": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                        },
+                        "title": {
+                            "type": "string",
+                        },
+                        "purpose": {
+                            "type": "string",
+                        },
+                        "kind": {
+                            "type": [
+                                "string",
+                                "null",
+                            ],
+                            "enum": [
+                                *TASK_KIND_VALUES,
+                                None,
+                            ],
+                        },
+                        "scope": {
+                            "type": [
+                                "string",
+                                "null",
+                            ],
+                            "enum": [
+                                *SCOPE_VALUES,
+                                None,
+                            ],
+                        },
+                        "verification": {
+                            "type": [
+                                "object",
+                                "null",
+                            ],
+                            "properties": {
+                                "allow_full_suite": {
+                                    "type": "boolean",
+                                },
+                                "baseline_required": {
+                                    "type": "boolean",
+                                },
+                            },
+                            "required": [
+                                "allow_full_suite",
+                                "baseline_required",
+                            ],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "required": [
+                        "id",
+                        "title",
+                        "purpose",
+                        "kind",
+                        "scope",
+                        "verification",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "questions": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+            "blockers": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                        },
+                        "kind": {
+                            "type": "string",
+                            "enum": list(
+                                BLOCKER_KIND_VALUES
+                            ),
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": list(
+                                BLOCKER_SCOPE_VALUES
+                            ),
+                        },
+                        "fixable_by_agent": {
+                            "type": "boolean",
+                        },
+                        "requires_human_input": {
+                            "type": "boolean",
+                        },
+                        "blocking": {
+                            "type": "boolean",
+                        },
+                    },
+                    "required": [
+                        "message",
+                        "kind",
+                        "scope",
+                        "fixable_by_agent",
+                        "requires_human_input",
+                        "blocking",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "handoff": {
+                "type": [
+                    "string",
+                    "null",
+                ],
+            },
+            "metadata": {
+                "type": "object",
+                "properties": {
+                    "technology_proposal": {
+                        "type": [
+                            "object",
+                            "null",
+                        ],
+                        "properties": {
+                            "components": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                        },
+                                        "technology": {
+                                            "type": "string",
+                                        },
+                                        "rationale": {
+                                            "type": "string",
+                                        },
+                                    },
+                                    "required": [
+                                        "name",
+                                        "technology",
+                                        "rationale",
+                                    ],
+                                    "additionalProperties": False,
+                                },
+                            },
+                        },
+                        "required": [
+                            "components",
+                        ],
+                        "additionalProperties": False,
+                    },
+                },
+                "required": [
+                    "technology_proposal",
+                ],
+                "additionalProperties": False,
+            },
+        },
+        "required": [
+            "status",
+            "summary",
+            "artifacts",
+            "artifact_requests",
+            "implementation_requests",
+            "questions",
+            "blockers",
+            "handoff",
+            "metadata",
+        ],
+        "additionalProperties": False,
+    }
+
+
 class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 
@@ -583,46 +816,13 @@ class OpenAIProvider(DevelopmentModelProvider):
     ) -> str:
         """Generate raw text content for a single artifact."""
 
-        request_kwargs: dict[str, Any] = {
-            "model": self.model,
-            "input": prompt,
-        }
-
-        max_output_tokens = self.settings.get(
-            "artifact_max_output_tokens",
-            self.settings.get(
-                "max_output_tokens",
+        return self._request(
+            prompt,
+            label="artifact",
+            max_output_tokens=self._max_output_tokens(
+                "artifact_max_output_tokens"
             ),
-        )
-
-        if max_output_tokens is not None:
-            request_kwargs["max_output_tokens"] = max_output_tokens
-
-        try:
-            response = self.client.responses.create(
-                **request_kwargs,
-            )
-        except Exception as error:
-            raise classify_openai_error(error) from error
-
-        if response.status == "incomplete":
-            incomplete_details = getattr(
-                response,
-                "incomplete_details",
-                None,
-            )
-
-            raise ValueError(
-                "OpenAI artifact response was incomplete. "
-                f"Details: {incomplete_details}"
-            )
-
-        if not response.output_text:
-            raise ValueError(
-                "OpenAI returned no artifact content."
-            )
-
-        return response.output_text.strip()
+        ).strip()
 
     def implement(
         self,
@@ -630,91 +830,21 @@ class OpenAIProvider(DevelopmentModelProvider):
     ) -> ImplementationResult:
         """Execute one focused implementation task."""
 
-        request_kwargs: dict[str, Any] = {
-            "model": self.model,
-            "input": prompt,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "implementation_result",
-                    "strict": True,
-                    "schema": build_implementation_result_schema(),
-                }
-            },
-        }
-
-        max_output_tokens = self.settings.get(
-            "implementation_max_output_tokens",
-            self.settings.get(
-                "max_output_tokens",
+        raw_output = self._request(
+            prompt,
+            label="implementation",
+            schema_name="implementation_result",
+            schema=build_implementation_result_schema(),
+            max_output_tokens=self._max_output_tokens(
+                "implementation_max_output_tokens"
+            ),
+            retry_max_output_tokens=self.settings.get(
+                "implementation_retry_max_output_tokens"
             ),
         )
 
-        if max_output_tokens is not None:
-            request_kwargs["max_output_tokens"] = max_output_tokens
-
-        try:
-            response = self.client.responses.create(
-                **request_kwargs,
-            )
-        except Exception as error:
-            raise classify_openai_error(error) from error
-
-        if response.status == "incomplete":
-            incomplete_details = getattr(
-                response,
-                "incomplete_details",
-                None,
-            )
-
-            reason = getattr(
-                incomplete_details,
-                "reason",
-                incomplete_details,
-            )
-
-            retry_max_output_tokens = self.settings.get(
-                "implementation_retry_max_output_tokens"
-            )
-
-            if (
-                reason == "max_output_tokens"
-                and retry_max_output_tokens is not None
-                and retry_max_output_tokens != max_output_tokens
-            ):
-                retry_kwargs = dict(
-                    request_kwargs
-                )
-                retry_kwargs[
-                    "max_output_tokens"
-                ] = retry_max_output_tokens
-
-                try:
-                    response = self.client.responses.create(
-                        **retry_kwargs,
-                    )
-                except Exception as error:
-                    raise classify_openai_error(error) from error
-
-        if response.status == "incomplete":
-            incomplete_details = getattr(
-                response,
-                "incomplete_details",
-                None,
-            )
-
-            raise ValueError(
-                "OpenAI implementation response was incomplete. "
-                f"Details: {incomplete_details}"
-            )
-
-        if not response.output_text:
-            raise ValueError(
-                "OpenAI returned no implementation content."
-            )
-
         return self._parse_implementation_result(
-            response.output_text,
+            raw_output,
         )
 
     def validate_qa(
@@ -723,54 +853,16 @@ class OpenAIProvider(DevelopmentModelProvider):
     ) -> QAResult:
         """Execute structured QA validation."""
 
-        request_kwargs: dict[str, Any] = {
-            "model": self.model,
-            "input": prompt,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "qa_result",
-                    "strict": True,
-                    "schema": build_qa_result_schema(),
-                }
-            },
-        }
-
-        max_output_tokens = self.settings.get(
-            "max_output_tokens"
+        raw_output = self._request(
+            prompt,
+            label="QA",
+            schema_name="qa_result",
+            schema=build_qa_result_schema(),
+            max_output_tokens=self._max_output_tokens(),
         )
 
-        if max_output_tokens is not None:
-            request_kwargs[
-                "max_output_tokens"
-            ] = max_output_tokens
-
-        try:
-            response = self.client.responses.create(
-                **request_kwargs,
-            )
-        except Exception as error:
-            raise classify_openai_error(error) from error
-
-        if response.status == "incomplete":
-            incomplete_details = getattr(
-                response,
-                "incomplete_details",
-                None,
-            )
-
-            raise ValueError(
-                "OpenAI QA response was incomplete. "
-                f"Details: {incomplete_details}"
-            )
-
-        if not response.output_text:
-            raise ValueError(
-                "OpenAI returned no QA content."
-            )
-
         return self._parse_qa_result(
-            response.output_text,
+            raw_output,
         )
 
     def validate_security(
@@ -779,54 +871,16 @@ class OpenAIProvider(DevelopmentModelProvider):
     ) -> SecurityResult:
         """Execute structured security validation."""
 
-        request_kwargs: dict[str, Any] = {
-            "model": self.model,
-            "input": prompt,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "security_result",
-                    "strict": True,
-                    "schema": build_security_result_schema(),
-                }
-            },
-        }
-
-        max_output_tokens = self.settings.get(
-            "max_output_tokens"
+        raw_output = self._request(
+            prompt,
+            label="security",
+            schema_name="security_result",
+            schema=build_security_result_schema(),
+            max_output_tokens=self._max_output_tokens(),
         )
 
-        if max_output_tokens is not None:
-            request_kwargs[
-                "max_output_tokens"
-            ] = max_output_tokens
-
-        try:
-            response = self.client.responses.create(
-                **request_kwargs,
-            )
-        except Exception as error:
-            raise classify_openai_error(error) from error
-
-        if response.status == "incomplete":
-            incomplete_details = getattr(
-                response,
-                "incomplete_details",
-                None,
-            )
-
-            raise ValueError(
-                "OpenAI security response was incomplete. "
-                f"Details: {incomplete_details}"
-            )
-
-        if not response.output_text:
-            raise ValueError(
-                "OpenAI returned no security content."
-            )
-
         return self._parse_security_result(
-            response.output_text,
+            raw_output,
         )
 
     def validate_devops(
@@ -835,54 +889,16 @@ class OpenAIProvider(DevelopmentModelProvider):
     ) -> DevOpsResult:
         """Execute structured DevOps validation."""
 
-        request_kwargs: dict[str, Any] = {
-            "model": self.model,
-            "input": prompt,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "devops_result",
-                    "strict": True,
-                    "schema": build_devops_result_schema(),
-                }
-            },
-        }
-
-        max_output_tokens = self.settings.get(
-            "max_output_tokens"
+        raw_output = self._request(
+            prompt,
+            label="DevOps",
+            schema_name="devops_result",
+            schema=build_devops_result_schema(),
+            max_output_tokens=self._max_output_tokens(),
         )
 
-        if max_output_tokens is not None:
-            request_kwargs[
-                "max_output_tokens"
-            ] = max_output_tokens
-
-        try:
-            response = self.client.responses.create(
-                **request_kwargs,
-            )
-        except Exception as error:
-            raise classify_openai_error(error) from error
-
-        if response.status == "incomplete":
-            incomplete_details = getattr(
-                response,
-                "incomplete_details",
-                None,
-            )
-
-            raise ValueError(
-                "OpenAI DevOps response was incomplete. "
-                f"Details: {incomplete_details}"
-            )
-
-        if not response.output_text:
-            raise ValueError(
-                "OpenAI returned no DevOps content."
-            )
-
         return self._parse_devops_result(
-            response.output_text,
+            raw_output,
         )
 
     def validate_sre(
@@ -891,54 +907,16 @@ class OpenAIProvider(DevelopmentModelProvider):
     ) -> SREResult:
         """Execute structured SRE validation."""
 
-        request_kwargs: dict[str, Any] = {
-            "model": self.model,
-            "input": prompt,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "sre_result",
-                    "strict": True,
-                    "schema": build_sre_result_schema(),
-                }
-            },
-        }
-
-        max_output_tokens = self.settings.get(
-            "max_output_tokens"
+        raw_output = self._request(
+            prompt,
+            label="SRE",
+            schema_name="sre_result",
+            schema=build_sre_result_schema(),
+            max_output_tokens=self._max_output_tokens(),
         )
 
-        if max_output_tokens is not None:
-            request_kwargs[
-                "max_output_tokens"
-            ] = max_output_tokens
-
-        try:
-            response = self.client.responses.create(
-                **request_kwargs,
-            )
-        except Exception as error:
-            raise classify_openai_error(error) from error
-
-        if response.status == "incomplete":
-            incomplete_details = getattr(
-                response,
-                "incomplete_details",
-                None,
-            )
-
-            raise ValueError(
-                "OpenAI SRE response was incomplete. "
-                f"Details: {incomplete_details}"
-            )
-
-        if not response.output_text:
-            raise ValueError(
-                "OpenAI returned no SRE content."
-            )
-
         return self._parse_sre_result(
-            response.output_text,
+            raw_output,
         )
 
     def run(
@@ -1255,266 +1233,97 @@ class OpenAIProvider(DevelopmentModelProvider):
         self,
         prompt: str,
     ) -> str:
-        """Send a prepared prompt to OpenAI."""
+        """Send a prepared agent prompt to OpenAI."""
+
+        return self._request(
+            prompt,
+            label=None,
+            schema_name="agent_result",
+            schema=build_agent_result_schema(),
+            max_output_tokens=self._max_output_tokens(
+                "agent_max_output_tokens"
+            ),
+        )
+
+    def _max_output_tokens(
+        self,
+        specific_key: str | None = None,
+    ) -> Any:
+        """Resolve a stage-specific token budget, then the shared one."""
+
+        if specific_key is None:
+            return self.settings.get("max_output_tokens")
+
+        return self.settings.get(
+            specific_key,
+            self.settings.get(
+                "max_output_tokens",
+            ),
+        )
+
+    def _request(
+        self,
+        prompt: str,
+        *,
+        label: str | None,
+        schema_name: str | None = None,
+        schema: dict | None = None,
+        max_output_tokens: Any = None,
+        retry_max_output_tokens: Any = None,
+    ) -> str:
+        """Call the Responses API and return its non-empty text output.
+
+        Every OpenAI call goes through here: transport failures, rate limits
+        included, are classified; an output truncated by its token budget is
+        retried once when a different retry budget is configured; an
+        incomplete or empty response is refused. `label` names the stage in
+        error messages, and None stands for the agent call itself.
+        """
 
         request_kwargs: dict[str, Any] = {
             "model": self.model,
             "input": prompt,
         }
 
-        request_kwargs["text"] = {
-            "format": {
-                "type": "json_schema",
-                "name": "agent_result",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "status": {
-                            "type": "string",
-                            "enum": [
-                                "COMPLETED",
-                                "NEEDS_INPUT",
-                                "BLOCKED",
-                                "REVIEW_REQUIRED",
-                            ],
-                        },
-                        "summary": {
-                            "type": "string",
-                        },
-                        "artifacts": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "path": {
-                                        "type": "string",
-                                    },
-                                    "content": {
-                                        "type": "string",
-                                    },
-                                },
-                                "required": [
-                                    "path",
-                                    "content",
-                                ],
-                                "additionalProperties": False,
-                            },
-                        },
-                        "artifact_requests": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "path": {
-                                        "type": "string",
-                                    },
-                                    "purpose": {
-                                        "type": "string",
-                                    },
-                                },
-                                "required": [
-                                    "path",
-                                    "purpose",
-                                ],
-                                "additionalProperties": False,
-                            },
-                        },
-                        "implementation_requests": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "id": {
-                                        "type": "string",
-                                    },
-                                    "title": {
-                                        "type": "string",
-                                    },
-                                    "purpose": {
-                                        "type": "string",
-                                    },
-                                    "kind": {
-                                        "type": [
-                                            "string",
-                                            "null",
-                                        ],
-                                        "enum": [
-                                            *TASK_KIND_VALUES,
-                                            None,
-                                        ],
-                                    },
-                                    "scope": {
-                                        "type": [
-                                            "string",
-                                            "null",
-                                        ],
-                                        "enum": [
-                                            *SCOPE_VALUES,
-                                            None,
-                                        ],
-                                    },
-                                    "verification": {
-                                        "type": [
-                                            "object",
-                                            "null",
-                                        ],
-                                        "properties": {
-                                            "allow_full_suite": {
-                                                "type": "boolean",
-                                            },
-                                            "baseline_required": {
-                                                "type": "boolean",
-                                            },
-                                        },
-                                        "required": [
-                                            "allow_full_suite",
-                                            "baseline_required",
-                                        ],
-                                        "additionalProperties": False,
-                                    },
-                                },
-                                "required": [
-                                    "id",
-                                    "title",
-                                    "purpose",
-                                    "kind",
-                                    "scope",
-                                    "verification",
-                                ],
-                                "additionalProperties": False,
-                            },
-                        },
-                        "questions": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                            },
-                        },
-                        "blockers": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "message": {
-                                        "type": "string",
-                                    },
-                                    "kind": {
-                                        "type": "string",
-                                        "enum": list(
-                                            BLOCKER_KIND_VALUES
-                                        ),
-                                    },
-                                    "scope": {
-                                        "type": "string",
-                                        "enum": list(
-                                            BLOCKER_SCOPE_VALUES
-                                        ),
-                                    },
-                                    "fixable_by_agent": {
-                                        "type": "boolean",
-                                    },
-                                    "requires_human_input": {
-                                        "type": "boolean",
-                                    },
-                                    "blocking": {
-                                        "type": "boolean",
-                                    },
-                                },
-                                "required": [
-                                    "message",
-                                    "kind",
-                                    "scope",
-                                    "fixable_by_agent",
-                                    "requires_human_input",
-                                    "blocking",
-                                ],
-                                "additionalProperties": False,
-                            },
-                        },
-                        "handoff": {
-                            "type": [
-                                "string",
-                                "null",
-                            ],
-                        },
-                        "metadata": {
-                            "type": "object",
-                            "properties": {
-                                "technology_proposal": {
-                                    "type": [
-                                        "object",
-                                        "null",
-                                    ],
-                                    "properties": {
-                                        "components": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "name": {
-                                                        "type": "string",
-                                                    },
-                                                    "technology": {
-                                                        "type": "string",
-                                                    },
-                                                    "rationale": {
-                                                        "type": "string",
-                                                    },
-                                                },
-                                                "required": [
-                                                    "name",
-                                                    "technology",
-                                                    "rationale",
-                                                ],
-                                                "additionalProperties": False,
-                                            },
-                                        },
-                                    },
-                                    "required": [
-                                        "components",
-                                    ],
-                                    "additionalProperties": False,
-                                },
-                            },
-                            "required": [
-                                "technology_proposal",
-                            ],
-                            "additionalProperties": False,
-                        },
-                    },
-                    "required": [
-                        "status",
-                        "summary",
-                        "artifacts",
-                        "artifact_requests",
-                        "implementation_requests",
-                        "questions",
-                        "blockers",
-                        "handoff",
-                        "metadata",
-                    ],
-                    "additionalProperties": False,
-                },
+        if schema is not None:
+            request_kwargs["text"] = {
+                "format": {
+                    "type": "json_schema",
+                    "name": schema_name,
+                    "strict": True,
+                    "schema": schema,
+                }
             }
-        }
-
-        max_output_tokens = self.settings.get(
-            "agent_max_output_tokens",
-            self.settings.get(
-                "max_output_tokens",
-            ),
-        )
 
         if max_output_tokens is not None:
             request_kwargs["max_output_tokens"] = max_output_tokens
 
-        try:
-            response = self.client.responses.create(
-                **request_kwargs,
+        response = self._create_response(request_kwargs)
+
+        if (
+            response.status == "incomplete"
+            and retry_max_output_tokens is not None
+            and retry_max_output_tokens != max_output_tokens
+        ):
+            incomplete_details = getattr(
+                response,
+                "incomplete_details",
+                None,
             )
-        except Exception as error:
-            raise classify_openai_error(error) from error
+
+            reason = getattr(
+                incomplete_details,
+                "reason",
+                incomplete_details,
+            )
+
+            if reason == "max_output_tokens":
+                response = self._create_response(
+                    {
+                        **request_kwargs,
+                        "max_output_tokens": retry_max_output_tokens,
+                    }
+                )
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -1523,17 +1332,38 @@ class OpenAIProvider(DevelopmentModelProvider):
                 None,
             )
 
+            subject = (
+                f"OpenAI {label} response"
+                if label
+                else "OpenAI response"
+            )
+
             raise ValueError(
-                "OpenAI response was incomplete. "
+                f"{subject} was incomplete. "
                 f"Details: {incomplete_details}"
             )
 
         if not response.output_text:
             raise ValueError(
-                "OpenAI returned no text output."
+                f"OpenAI returned no {label} content."
+                if label
+                else "OpenAI returned no text output."
             )
 
         return response.output_text
+
+    def _create_response(
+        self,
+        request_kwargs: dict[str, Any],
+    ) -> Any:
+        """Send one request, classifying any transport failure."""
+
+        try:
+            return self.client.responses.create(
+                **request_kwargs,
+            )
+        except Exception as error:
+            raise classify_openai_error(error) from error
 
     @parses_provider_result("implementation_result")
     def _parse_implementation_result(
