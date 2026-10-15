@@ -1,5 +1,8 @@
 from pathlib import Path
 
+from ai_factory.validation_context import (
+    add_validation_evidence,
+)
 from ai_factory.agent_result import AgentResult
 from ai_factory.agent_runner import run_agent
 from ai_factory.artifact_runtime import run_artifact_generation
@@ -247,7 +250,11 @@ def run_next_agent(
             ):
                 developer_result = stored_result
 
-        qa_context = dict(context)
+        qa_context = add_validation_evidence(
+            context,
+            project_root=project_root,
+            developer_result=developer_result,
+        )
         qa_context["developer"] = developer_result
 
         qa_execution = run_qa_validation(
@@ -313,7 +320,11 @@ def run_next_agent(
                 ):
                     qa_result = stored_qa_result
 
-        security_context = dict(context)
+        security_context = add_validation_evidence(
+            context,
+            project_root=project_root,
+            developer_result=developer_result,
+        )
         security_context["developer"] = (
             developer_result
         )
@@ -387,7 +398,11 @@ def run_next_agent(
                 if isinstance(stored_result, dict):
                     security_result = stored_result
 
-        devops_context = dict(context)
+        devops_context = add_validation_evidence(
+            context,
+            project_root=project_root,
+            developer_result=developer_result,
+        )
         devops_context["developer"] = developer_result
         devops_context["qa"] = qa_result
         devops_context["security"] = security_result
@@ -459,7 +474,11 @@ def run_next_agent(
                 else:
                     devops_result = stored_result
 
-        sre_context = dict(context)
+        sre_context = add_validation_evidence(
+            context,
+            project_root=project_root,
+            developer_result=developer_result,
+        )
         sre_context["developer"] = developer_result
         sre_context["qa"] = qa_result
         sre_context["security"] = security_result
