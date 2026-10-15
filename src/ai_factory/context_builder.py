@@ -3,6 +3,7 @@ from typing import Any
 
 from ai_factory.agent_loader import load_agent_contract
 from ai_factory.orchestrator import AGENT_ORDER
+from ai_factory.rework import get_open_rework
 from ai_factory.state import load_state
 
 
@@ -306,7 +307,7 @@ def build_agent_context(
         agent_name=agent_name,
     )
 
-    return {
+    context = {
         "agent_name": agent_name,
         "contract": contract,
         "project": project_config,
@@ -314,3 +315,11 @@ def build_agent_context(
         "artifacts": combined_artifacts,
         "human_input": human_input,
     }
+
+    if agent_name == "developer":
+        rework = get_open_rework(state)
+
+        if rework is not None:
+            context["rework_request"] = rework
+
+    return context

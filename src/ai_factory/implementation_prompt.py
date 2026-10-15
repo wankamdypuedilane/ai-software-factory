@@ -1,5 +1,7 @@
 from typing import Any
 
+from ai_factory.rework import format_rework_request
+
 from ai_factory.implementation_request import ImplementationTask
 
 
@@ -106,6 +108,17 @@ def build_implementation_prompt(
         task.purpose,
     ]
 
+    rework = context.get("rework_request")
+
+    if isinstance(rework, dict):
+        sections.extend(
+            [
+                "",
+                "## Rework Request",
+                *format_rework_request(rework),
+            ]
+        )
+
     if policy_corrections:
         sections.extend(
             [
@@ -208,6 +221,10 @@ def build_implementation_prompt(
             [
                 "",
                 "## Current Workspace Files",
+                "These files already exist in the project. Integrate with "
+                "them: import what they define, keep their names, "
+                "signatures, return values and tests, and change them only "
+                "when this task requires it.",
             ]
         )
 

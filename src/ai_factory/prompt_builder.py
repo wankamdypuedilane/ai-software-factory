@@ -1,6 +1,8 @@
 import json
 from typing import Any
 
+from ai_factory.rework import format_rework_request
+
 
 def get_agent_specific_instruction(
     agent_name: str,
@@ -80,6 +82,19 @@ def build_agent_prompt(
                 "",
                 "## Human Input",
                 human_input.strip(),
+            ]
+        )
+
+    rework = context.get("rework_request")
+
+    if isinstance(rework, dict):
+        sections.extend(
+            [
+                "",
+                "## Rework Request",
+                *format_rework_request(rework),
+                "Plan only the implementation_requests needed to fix these "
+                "items; do not re-plan work that is already implemented.",
             ]
         )
 

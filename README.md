@@ -63,7 +63,10 @@ Factory cannot record it for you.
 
 Agents can propose commands, findings and severities. Whether a phase passed
 is derived from what actually ran. A failed or blocked agent can be sent back
-with `ai-factory retry <agent>`. A blocker that needs a human decision stops
+with `ai-factory retry <agent>`. When QA, Security, DevOps or SRE finds a
+defect in already approved code, `ai-factory rework <phase>` sends its items
+back to the Developer and reopens every validation after it. A blocker that
+needs a human decision stops
 the workflow until `ai-factory resume <agent>` or
 `ai-factory resolve-blocker <approval>`.
 
@@ -211,6 +214,7 @@ Other useful commands:
 | `ai-factory next` | Show the next agent that should work |
 | `ai-factory run` | Run only the next ready agent |
 | `ai-factory retry <agent>` | Re-run a blocked, failed or review-required agent |
+| `ai-factory rework qa\|security\|devops\|sre` | Send a validator's defects back to the approved Developer |
 | `ai-factory resume <agent>` | Resume a blocked agent once the human input is provided |
 | `ai-factory resolve-blocker <approval>` | Record that a gate's external blockers were resolved |
 | `ai-factory checkpoint create\|list\|restore` | Capture and restore workflow milestones |
