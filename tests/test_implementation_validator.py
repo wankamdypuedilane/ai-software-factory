@@ -94,3 +94,22 @@ def test_validate_implementation_file_change_rejects_other_operations() -> None:
         validate_implementation_file_change(
             change
         )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/etc/passwd",
+        "C:\\Users\\test\\file.py",
+        "c:relative.py",
+        "//server/share/file.py",
+    ],
+)
+def test_validate_implementation_path_rejects_absolute_paths_on_any_os(
+    path: str,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="Absolute implementation path is not allowed",
+    ):
+        validate_implementation_path(path)
