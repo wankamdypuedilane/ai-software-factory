@@ -1418,7 +1418,10 @@ class OpenAIProvider(DevelopmentModelProvider):
 
             raise ValueError(
                 f"{subject} was incomplete. "
-                f"Details: {incomplete_details}"
+                f"Details: {incomplete_details}. "
+                "If the reason is max_output_tokens, raise "
+                "ai.settings.max_output_tokens (or the stage-specific "
+                "budget) in .factory/project.yaml and relaunch."
             )
 
         if not response.output_text:

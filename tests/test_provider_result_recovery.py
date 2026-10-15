@@ -476,3 +476,45 @@ def test_a_provider_result_failure_never_becomes_a_successful_unit(
         )
 
     assert not any(tmp_path.rglob("*.ts"))
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "NON_CONVERGING_IMPLEMENTATION: two consecutive Developer cycles "
+        "produced the same failure.",
+        "OpenAI implementation response was incomplete. "
+        "Details: IncompleteDetails(reason='max_output_tokens').",
+    ],
+)
+def test_a_workflow_stop_is_not_an_argparse_usage_error(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+    message: str,
+) -> None:
+    """A real run printed the usage banner for both of these stops."""
+
+    from ai_factory import cli
+
+    _workflow_project(tmp_path)
+
+    def stopping_workflow(**kwargs):
+        raise ValueError(message)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "run_workflow", stopping_workflow)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["ai-factory", "run-workflow"],
+    )
+
+    with pytest.raises(SystemExit) as exit_error:
+        cli.main()
+
+    captured = capsys.readouterr()
+
+    assert exit_error.value.code == cli.WORKFLOW_STOP_EXIT_CODE
+    assert "usage: ai-factory" not in captured.out + captured.err
+    assert f"Workflow stopped: {message}" in captured.err
+    assert "ai-factory status" in captured.err
