@@ -1974,7 +1974,9 @@ def test_openai_provider_implement_returns_structured_result(
 
     assert captured["model"] == "test-model"
     assert captured["input"] == "implementation prompt"
-    assert captured["max_output_tokens"] == 2500
+    # A shared budget sized for summaries is raised to the implementation
+    # floor rather than truncating generated files.
+    assert captured["max_output_tokens"] == 32000
 
     response_format = captured["text"]["format"]
 
@@ -2683,3 +2685,58 @@ def test_openai_provider_rejects_invalid_client_settings(
             model="test-model",
             settings=settings,
         )
+
+
+def _implementation_budget_provider(monkeypatch, settings):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    return OpenAIProvider(
+        model="test-model",
+        settings=settings,
+    )
+
+
+def test_implementation_budget_honors_an_explicit_setting(monkeypatch) -> None:
+    provider = _implementation_budget_provider(
+        monkeypatch,
+        {
+            "max_output_tokens": 2500,
+            "implementation_max_output_tokens": 8000,
+            "implementation_retry_max_output_tokens": 9000,
+        },
+    )
+
+    assert provider._implementation_max_output_tokens() == 8000
+    assert provider._implementation_retry_max_output_tokens() == 9000
+
+
+def test_implementation_budget_keeps_a_larger_shared_budget(monkeypatch) -> None:
+    provider = _implementation_budget_provider(
+        monkeypatch,
+        {"max_output_tokens": 50000},
+    )
+
+    assert provider._implementation_max_output_tokens() == 50000
+    assert provider._implementation_retry_max_output_tokens() == 100000
+
+
+def test_implementation_budget_stays_unset_without_any_budget(monkeypatch) -> None:
+    provider = _implementation_budget_provider(
+        monkeypatch,
+        {"max_output_tokens": None},
+    )
+
+    assert provider._implementation_max_output_tokens() is None
+    assert provider._implementation_retry_max_output_tokens() is None
+
+
+def test_implementation_budget_retries_truncation_with_double_budget(
+    monkeypatch,
+) -> None:
+    provider = _implementation_budget_provider(
+        monkeypatch,
+        {"max_output_tokens": 16000},
+    )
+
+    assert provider._implementation_max_output_tokens() == 32000
+    assert provider._implementation_retry_max_output_tokens() == 64000

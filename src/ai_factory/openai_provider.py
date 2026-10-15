@@ -771,6 +771,12 @@ def build_agent_result_schema() -> dict:
     }
 
 
+# Floor for an implementation unit's output budget when only the shared
+# budget is configured. Raised from a real run where 16000 tokens truncated a
+# single command-line module.
+DEFAULT_IMPLEMENTATION_MAX_OUTPUT_TOKENS = 32000
+
+
 class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 
@@ -867,11 +873,9 @@ class OpenAIProvider(DevelopmentModelProvider):
             label="implementation",
             schema_name="implementation_result",
             schema=build_implementation_result_schema(),
-            max_output_tokens=self._max_output_tokens(
-                "implementation_max_output_tokens"
-            ),
-            retry_max_output_tokens=self.settings.get(
-                "implementation_retry_max_output_tokens"
+            max_output_tokens=self._implementation_max_output_tokens(),
+            retry_max_output_tokens=(
+                self._implementation_retry_max_output_tokens()
             ),
         )
 
@@ -1292,6 +1296,48 @@ class OpenAIProvider(DevelopmentModelProvider):
                 "max_output_tokens",
             ),
         )
+
+    def _implementation_max_output_tokens(self) -> Any:
+        """Resolve the token budget of one implementation unit.
+
+        A unit returns complete files inside a JSON document, which needs far
+        more room than any other stage. A shared budget sized for summaries
+        is therefore raised to a floor instead of truncating the code.
+        """
+
+        explicit = self.settings.get(
+            "implementation_max_output_tokens"
+        )
+
+        if explicit is not None:
+            return explicit
+
+        shared = self.settings.get("max_output_tokens")
+
+        if not isinstance(shared, int) or isinstance(shared, bool):
+            return shared
+
+        return max(
+            shared,
+            DEFAULT_IMPLEMENTATION_MAX_OUTPUT_TOKENS,
+        )
+
+    def _implementation_retry_max_output_tokens(self) -> Any:
+        """Resolve the budget of the single retry of a truncated unit."""
+
+        explicit = self.settings.get(
+            "implementation_retry_max_output_tokens"
+        )
+
+        if explicit is not None:
+            return explicit
+
+        first = self._implementation_max_output_tokens()
+
+        if not isinstance(first, int) or isinstance(first, bool):
+            return None
+
+        return first * 2
 
     def _request(
         self,
