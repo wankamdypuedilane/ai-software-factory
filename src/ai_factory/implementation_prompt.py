@@ -6,6 +6,16 @@ from ai_factory.implementation_request import ImplementationTask
 # Measurable context budget. Each category is bounded on its own so that one
 # oversized input cannot crowd out the others.
 MAX_RELEVANT_ARTIFACT_CHARS = 4000
+
+# Artifacts that fix the contract between independent implementation units.
+# They are supplied first and in full (up to their own cap), never squeezed
+# out by the shared artifact budget: a real run produced two units that
+# disagreed on a return type because nothing fixed it for both.
+BINDING_CONTRACT_ARTIFACTS = (
+    "knowledge/architecture/interfaces.md",
+    "knowledge/architecture/api.md",
+)
+MAX_BINDING_CONTRACT_CHARS = 16000
 MAX_RELEVANT_ARTIFACTS_TOTAL_CHARS = 32000
 
 MAX_WORKSPACE_FILE_CHARS = 6000
@@ -118,6 +128,39 @@ def build_implementation_prompt(
             repr(state),
         ]
     )
+
+    artifacts = dict(artifacts or {})
+
+    binding_contracts = {
+        path: artifacts.pop(path)
+        for path in BINDING_CONTRACT_ARTIFACTS
+        if isinstance(artifacts.get(path), str)
+    }
+
+    if binding_contracts:
+        sections.extend(
+            [
+                "",
+                "## Binding Contracts",
+                "These documents fix the interfaces shared by every "
+                "implementation unit. Implement them exactly: do not change "
+                "a module path, function name, parameter, return value, "
+                "exception, or output they define, and write tests that "
+                "assert exactly what they define.",
+            ]
+        )
+
+        for path, content in binding_contracts.items():
+            sections.extend(
+                [
+                    "",
+                    f"### {path}",
+                    _truncate(
+                        content.strip(),
+                        MAX_BINDING_CONTRACT_CHARS,
+                    ),
+                ]
+            )
 
     if artifacts:
         sections.extend(

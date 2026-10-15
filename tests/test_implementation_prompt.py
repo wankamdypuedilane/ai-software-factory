@@ -661,3 +661,53 @@ def test_implementation_prompt_requires_existing_or_written_test_files() -> None
 
     assert "python -m pytest <test-file>" in prompt
     assert "a later task will create" in prompt
+
+
+def test_binding_contracts_come_first_and_are_not_squeezed_out() -> None:
+    from ai_factory.implementation_prompt import build_implementation_prompt
+    from ai_factory.implementation_request import ImplementationTask
+
+    filler = {
+        f"knowledge/project/doc-{index}.md": "x" * 4000
+        for index in range(10)
+    }
+    interfaces = "complete_todo(data, raw_id) -> bool\n" + "y" * 6000
+
+    prompt = build_implementation_prompt(
+        task=ImplementationTask(
+            agent_name="developer",
+            id="todo-cli",
+            title="CLI",
+            purpose="Implement the CLI.",
+        ),
+        context={
+            "artifacts": {
+                **filler,
+                "knowledge/architecture/interfaces.md": interfaces,
+            },
+        },
+    )
+
+    assert "## Binding Contracts" in prompt
+    assert interfaces in prompt
+    assert prompt.index("## Binding Contracts") < prompt.index(
+        "## Relevant Artifacts"
+    )
+    assert prompt.count("### knowledge/architecture/interfaces.md") == 1
+
+
+def test_no_binding_contract_section_without_contract_artifacts() -> None:
+    from ai_factory.implementation_prompt import build_implementation_prompt
+    from ai_factory.implementation_request import ImplementationTask
+
+    prompt = build_implementation_prompt(
+        task=ImplementationTask(
+            agent_name="developer",
+            id="task",
+            title="Task",
+            purpose="Do it.",
+        ),
+        context={"artifacts": {"knowledge/project/vision.md": "v"}},
+    )
+
+    assert "## Binding Contracts" not in prompt

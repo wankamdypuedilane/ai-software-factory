@@ -30,6 +30,7 @@ UPSTREAM_ARTIFACT_PREFIXES = {
         "workflows/backlog/",
         "design/ux-ui/screen-specs.md",
         "knowledge/architecture/api.md",
+        "knowledge/architecture/interfaces.md",
     ),
     "security": (
         "knowledge/project/requirements.md",
