@@ -66,3 +66,42 @@ def test_create_provider_returns_openai_provider(
     assert provider.model == "test-model"
     assert provider.settings["temperature"] == 0.2
     assert provider.settings["max_output_tokens"] == 2000
+
+
+def test_create_provider_forwards_openai_client_settings(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "COMPATIBLE_API_KEY",
+        "compatible-key",
+    )
+
+    captured = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.OpenAI",
+        FakeOpenAI,
+    )
+
+    config = {
+        "ai": {
+            "provider": "openai",
+            "model": "test-model",
+            "settings": {
+                "base_url": "https://llm.example.test/v1",
+                "api_key_env": "COMPATIBLE_API_KEY",
+            },
+        }
+    }
+
+    provider = create_provider(config)
+
+    assert isinstance(provider, OpenAIProvider)
+    assert captured == {
+        "api_key": "compatible-key",
+        "base_url": "https://llm.example.test/v1",
+    }

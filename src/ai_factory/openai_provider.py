@@ -798,16 +798,48 @@ class OpenAIProvider(DevelopmentModelProvider):
                     override=False,
                 )
 
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key_env = self.settings.get("api_key_env")
+
+        if api_key_env is None:
+            api_key_env = "OPENAI_API_KEY"
+
+        if not isinstance(api_key_env, str) or not api_key_env.strip():
+            raise ValueError(
+                "ai.settings.api_key_env must be a non-empty "
+                "environment variable name."
+            )
+
+        base_url = self.settings.get("base_url")
+
+        if base_url is not None and (
+            not isinstance(base_url, str) or not base_url.strip()
+        ):
+            raise ValueError(
+                "ai.settings.base_url must be a non-empty URL."
+            )
+
+        api_key = os.getenv(api_key_env)
 
         if not api_key:
             raise ValueError(
-                "OPENAI_API_KEY environment variable is required."
+                f"{api_key_env} environment variable is required."
             )
 
         self.api_key = api_key
+        self.api_key_env = api_key_env
+        self.base_url = base_url
+
+        client_kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+        }
+
+        # Left out when unset so the SDK keeps its own default endpoint,
+        # including an OPENAI_BASE_URL from the environment.
+        if base_url is not None:
+            client_kwargs["base_url"] = base_url
+
         self.client = OpenAI(
-            api_key=self.api_key,
+            **client_kwargs,
         )
 
     def generate(
