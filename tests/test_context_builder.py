@@ -652,3 +652,62 @@ def test_load_upstream_generated_artifacts_filters_irrelevant_files(
         "design/ux-ui/design-system.md"
         not in artifacts
     )
+
+
+def test_artifact_in_unconventional_location_reaches_downstream_agents() -> None:
+    path = "knowledge/design/ux-ui-spec.md"
+
+    for agent in ("architect", "developer", "qa"):
+        assert is_artifact_relevant_to_agent(
+            path,
+            agent,
+            producer_agent="ux_ui",
+        )
+
+    assert not is_artifact_relevant_to_agent(
+        path,
+        "devops",
+        producer_agent="ux_ui",
+    )
+    assert not is_artifact_relevant_to_agent(
+        path,
+        "architect",
+    )
+
+
+def test_conventional_location_keeps_prefix_filtering() -> None:
+    assert not is_artifact_relevant_to_agent(
+        "design/ux-ui/design-system.md",
+        "qa",
+        producer_agent="ux_ui",
+    )
+
+
+def test_load_upstream_generated_artifacts_keeps_unconventional_paths(
+    tmp_path: Path,
+) -> None:
+    spec = tmp_path / "knowledge" / "design" / "ux-ui-spec.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("CLI contract", encoding="utf-8")
+
+    state = {
+        "agents": {
+            "ux_ui": {
+                "last_result": {
+                    "generated_artifacts": [
+                        "knowledge/design/ux-ui-spec.md",
+                    ],
+                },
+            },
+        },
+    }
+
+    artifacts = load_upstream_generated_artifacts(
+        project_root=tmp_path,
+        state=state,
+        agent_name="architect",
+    )
+
+    assert artifacts == {
+        "knowledge/design/ux-ui-spec.md": "CLI contract",
+    }
