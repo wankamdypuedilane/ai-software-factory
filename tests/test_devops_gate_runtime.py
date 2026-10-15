@@ -79,8 +79,10 @@ def test_update_devops_gate_marks_not_ready() -> None:
         in gate["reasons"]
     )
 
+    # The gate names the deterministic conditions it observed rather than
+    # repeating a stored flag derived from them.
     assert (
-        "DevOps validation did not pass."
+        "DevOps tests failed."
         in gate["reasons"]
     )
 

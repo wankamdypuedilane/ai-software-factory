@@ -91,8 +91,10 @@ def test_update_sre_gate_marks_not_ready() -> None:
         in gate["reasons"]
     )
 
+    # The gate names the deterministic conditions it observed rather than
+    # repeating a stored flag derived from them.
     assert (
-        "SRE validation did not pass."
+        "SRE tests failed."
         in gate["reasons"]
     )
 

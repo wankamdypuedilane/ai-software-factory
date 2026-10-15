@@ -1,7 +1,10 @@
 from pathlib import Path
 from typing import Any
 
-from ai_factory.approvals import approve
+from ai_factory.approvals import (
+    APPROVAL_AGENT_MAP,
+    approve,
+)
 from ai_factory.orchestrator import activate_next_agent
 from ai_factory.phases import (
     update_project_phase,
@@ -10,18 +13,6 @@ from ai_factory.production_gate_runtime import (
     update_production_gate_from_state,
 )
 from ai_factory.transitions import set_agent_status
-
-
-APPROVAL_AGENT_MAP = {
-    "product_scope": "product",
-    "design": "ux_ui",
-    "architecture": "architect",
-    "development": "developer",
-    "qa": "qa",
-    "security": "security",
-    "devops": "devops",
-    "sre": "sre",
-}
 
 
 def apply_approval(
@@ -222,6 +213,7 @@ def apply_approval(
         agent_name,
         "APPROVED",
         project_root=project_root,
+        via_approval=True,
     )
 
     state = approve(

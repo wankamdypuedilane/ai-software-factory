@@ -2,6 +2,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ai_factory.devops_evidence import (
+    DevOpsEvidence,
+    describe_devops_evidence,
+    devops_evidence_satisfied,
+)
 from ai_factory.devops_prompt import (
     build_devops_prompt,
 )
@@ -26,15 +31,30 @@ class DevOpsExecution:
     test_results: list[CommandExecutionResult]
 
     @property
+    def evidence(self) -> DevOpsEvidence:
+        """What the engine observed, independently of what was claimed."""
+
+        return describe_devops_evidence(
+            test_results=self.test_results,
+            blockers=self.result.blockers,
+            deployment_ready=self.result.deployment_ready,
+            rollback_strategy=self.result.rollback_strategy,
+        )
+
+    @property
     def passed(self) -> bool:
+        """Whether DevOps succeeded, decided by observable requirements.
+
+        The declared deployment flag and rollback strategy are still
+        required - nothing is relaxed - and an executed check is now
+        required with them. `result.passed` is kept as a veto: an agent
+        reporting a problem is still believed, but it can no longer grant
+        success on its own.
+        """
+
         return (
-            self.result.passed
-            and self.result.deployment_ready
-            and all(
-                test_result.passed
-                for test_result in self.test_results
-            )
-            and not self.result.blockers
+            devops_evidence_satisfied(self.evidence)
+            and self.result.passed
         )
 
 

@@ -1,3 +1,8 @@
+from ai_factory.security_evidence import (
+    describe_security_evidence,
+    security_evidence_reasons,
+    security_evidence_satisfied,
+)
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,54 +39,40 @@ def evaluate_security_gate(
             reasons=reasons,
         )
 
-    if last_result.get("security_blockers"):
-        reasons.append(
-            "Security has unresolved blockers."
-        )
-
-    if last_result.get("security_passed") is not True:
-        reasons.append(
-            "Security validation did not pass."
-        )
-
     test_results = last_result.get(
         "security_test_results",
         [],
     )
-
-    if (
-        isinstance(test_results, list)
-        and any(
-            isinstance(item, dict)
-            and item.get("passed") is False
-            for item in test_results
-        )
-    ):
-        reasons.append(
-            "Security tests failed."
-        )
 
     findings = last_result.get(
         "security_findings",
         [],
     )
 
-    if isinstance(findings, list):
-        blocking_severities = {
-            "Critical",
-            "High",
-        }
+    # Re-derived from persisted evidence rather than trusted from the stored
+    # `security_passed` flag. The runtime already decides the same way, so a
+    # state this engine wrote is unaffected - and a state written by an
+    # older engine, restored, or edited by hand can no longer assert a
+    # success that no executed check supports.
+    evidence = describe_security_evidence(
+        test_results=test_results if isinstance(test_results, list) else [],
+        blockers=last_result.get("security_blockers", []),
+        findings=findings if isinstance(findings, list) else [],
+    )
 
-        if any(
-            isinstance(finding, dict)
-            and finding.get("severity")
-            in blocking_severities
-            and finding.get("status") != "RESOLVED"
-            for finding in findings
-        ):
-            reasons.append(
-                "Security has unresolved Critical or High severity findings."
-            )
+    reasons.extend(
+        security_evidence_reasons(evidence)
+    )
+
+    # The agent keeps its veto: it may report a problem over green checks,
+    # and the gate honours that. It may not open the gate on its own.
+    if (
+        security_evidence_satisfied(evidence)
+        and last_result.get("security_passed") is not True
+    ):
+        reasons.append(
+            "Security validation did not pass."
+        )
 
     return SecurityGateEvaluation(
         ready=not reasons,

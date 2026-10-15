@@ -145,7 +145,18 @@ def test_security_gate_allows_resolved_high_findings() -> None:
             "last_result": {
                 "security_passed": True,
                 "security_blockers": [],
-                "security_test_results": [],
+                # Readiness needs executed evidence as well as a resolved
+                # finding: this test is about the finding, not about
+                # clearing the gate on nothing.
+                "security_test_results": [
+                    {
+                        "command": "npm audit --audit-level=high",
+                        "returncode": 0,
+                        "passed": True,
+                        "stdout": "",
+                        "stderr": "",
+                    }
+                ],
                 "security_findings": [
                     {
                         "id": "SEC-001",

@@ -1,15 +1,27 @@
+ALLOWED_TEST_COMMANDS = {
+    "npm test",
+    "npm run test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run lint",
+    "npm run prisma:validate",
+}
+
 ALLOWED_TEST_COMMAND_PREFIXES = (
     "pytest",
     "python -m pytest",
-    "npm test",
-    "npm run test",
+)
+
+ALLOWED_TARGETED_TEST_COMMAND_PREFIXES = (
+    "npm test -- ",
+    "npm run test -- ",
 )
 
 
 def validate_test_command(
     command: str,
 ) -> None:
-    """Validate a test command declared by an implementation result."""
+    """Validate a test or verification command."""
 
     if not isinstance(command, str) or not command.strip():
         raise ValueError(
@@ -18,9 +30,17 @@ def validate_test_command(
 
     normalized = command.strip()
 
-    if not normalized.startswith(
-        ALLOWED_TEST_COMMAND_PREFIXES
-    ):
+    allowed = (
+        normalized in ALLOWED_TEST_COMMANDS
+        or normalized.startswith(
+            ALLOWED_TEST_COMMAND_PREFIXES
+        )
+        or normalized.startswith(
+            ALLOWED_TARGETED_TEST_COMMAND_PREFIXES
+        )
+    )
+
+    if not allowed:
         raise ValueError(
             f"Test command is not allowed: {command}"
         )

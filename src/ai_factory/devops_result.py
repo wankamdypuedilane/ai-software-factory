@@ -1,3 +1,7 @@
+from ai_factory.blocker_contract import (
+    Blocker,
+    coerce_blockers,
+)
 from dataclasses import dataclass, field
 
 
@@ -21,9 +25,12 @@ class DevOpsResult:
         default_factory=list
     )
 
-    blockers: list[str] = field(
+    blockers: list[Blocker] = field(
         default_factory=list
     )
+
+    def __post_init__(self) -> None:
+        self.blockers = coerce_blockers(self.blockers)
 
     deployment_ready: bool = False
 

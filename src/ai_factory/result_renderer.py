@@ -1,3 +1,4 @@
+from ai_factory.blocker_contract import is_effectively_blocking
 from ai_factory.agent_result import AgentResult
 
 
@@ -37,8 +38,14 @@ def render_agent_result(
         )
 
         for blocker in result.blockers:
+            marker = (
+                ""
+                if is_effectively_blocking(blocker)
+                else " (not blocking)"
+            )
+
             lines.append(
-                f"- {blocker}"
+                f"- {blocker.message}{marker}"
             )
 
     if result.artifacts:

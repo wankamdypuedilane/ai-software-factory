@@ -5,6 +5,11 @@ from typing import Any
 from ai_factory.providers import (
     SecurityProvider,
 )
+from ai_factory.security_evidence import (
+    SecurityEvidence,
+    describe_security_evidence,
+    security_evidence_satisfied,
+)
 from ai_factory.security_prompt import (
     build_security_prompt,
 )
@@ -26,14 +31,29 @@ class SecurityExecution:
     test_results: list[CommandExecutionResult]
 
     @property
+    def evidence(self) -> SecurityEvidence:
+        """What the engine observed, independently of what was claimed."""
+
+        return describe_security_evidence(
+            test_results=self.test_results,
+            blockers=self.result.blockers,
+            findings=self.result.findings,
+        )
+
+    @property
     def passed(self) -> bool:
+        """Whether security passed, decided by executed evidence.
+
+        `result.passed` can no longer carry this alone: with no executed
+        check there is nothing to be right about. It is kept as a veto, so
+        an agent reporting a problem is still believed even when every
+        command it ran was green - withholding success is safe, and the
+        reason belongs in its findings or blockers.
+        """
+
         return (
-            self.result.passed
-            and all(
-                test_result.passed
-                for test_result in self.test_results
-            )
-            and not self.result.blockers
+            security_evidence_satisfied(self.evidence)
+            and self.result.passed
         )
 
 

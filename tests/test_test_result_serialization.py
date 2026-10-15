@@ -19,6 +19,10 @@ def test_truncate_test_output_keeps_short_output() -> None:
     assert result == value
 
 
+def test_truncate_test_output_accepts_none() -> None:
+    assert truncate_test_output(None) == ""
+
+
 def test_truncate_test_output_truncates_long_output() -> None:
     value = "A" * 5000
 

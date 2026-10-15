@@ -1,6 +1,10 @@
 from typing import Any
 
 from ai_factory.agent_result import AgentResult
+from ai_factory.blocker_contract import serialize_blockers
+from ai_factory.implementation_contract import (
+    serialize_contract_fields,
+)
 from ai_factory.result_policy import get_agent_status_from_result
 
 
@@ -33,7 +37,7 @@ def apply_agent_result(
         "status": result.status,
         "summary": result.summary,
         "questions": list(result.questions),
-        "blockers": list(result.blockers),
+        "blockers": serialize_blockers(result.blockers),
         "handoff": result.handoff,
         "artifacts": [
             artifact.path
@@ -51,6 +55,11 @@ def apply_agent_result(
                 "id": request.id,
                 "title": request.title,
                 "purpose": request.purpose,
+                **serialize_contract_fields(
+                    request.kind,
+                    request.scope,
+                    request.verification,
+                ),
             }
             for request in result.implementation_requests
         ],

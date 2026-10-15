@@ -660,12 +660,24 @@ def test_parse_result_supports_implementation_requests(
             {
                 "id": "US-001",
                 "title": "Passenger authentication",
-                "purpose": "Implement authentication with automated tests."
+                "purpose": "Implement authentication with automated tests.",
+                "kind": "IMPLEMENTATION",
+                "scope": "TASK",
+                "verification": {
+                    "allow_full_suite": false,
+                    "baseline_required": true
+                }
             },
             {
                 "id": "US-002",
                 "title": "Ride request workflow",
-                "purpose": "Implement ride creation and status handling."
+                "purpose": "Implement ride creation and status handling.",
+                "kind": "IMPLEMENTATION",
+                "scope": "TASK",
+                "verification": {
+                    "allow_full_suite": false,
+                    "baseline_required": true
+                }
             }
         ],
         "questions": [],
@@ -710,6 +722,7 @@ def test_build_implementation_result_schema() -> None:
         "task_id",
         "summary",
         "files",
+        "setup_commands",
         "tests",
         "blockers",
     }
@@ -719,6 +732,7 @@ def test_build_implementation_result_schema() -> None:
     assert "task_id" in properties
     assert "summary" in properties
     assert "files" in properties
+    assert "setup_commands" in properties
     assert "tests" in properties
     assert "blockers" in properties
 
@@ -2004,6 +2018,230 @@ def test_openai_provider_implement_rejects_incomplete_response(
         )
 
 
+def test_openai_provider_implement_retries_once_when_output_token_limit_is_reached(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "implementation_max_output_tokens": 5000,
+            "implementation_retry_max_output_tokens": 10000,
+        },
+    )
+
+    calls = []
+
+    class FakeIncompleteDetails:
+        reason = "max_output_tokens"
+
+    class FakeIncompleteResponse:
+        status = "incomplete"
+        incomplete_details = FakeIncompleteDetails()
+        output_text = ""
+
+    class FakeCompletedResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = """
+        {
+          "task_id": "TASK-001",
+          "summary": "Implementation completed after retry.",
+          "files": [],
+          "setup_commands": [],
+          "tests": [],
+          "blockers": []
+        }
+        """
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+
+            if len(calls) == 1:
+                return FakeIncompleteResponse()
+
+            return FakeCompletedResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    result = provider.implement(
+        "implementation prompt"
+    )
+
+    assert result.task_id == "TASK-001"
+    assert len(calls) == 2
+    assert calls[0]["max_output_tokens"] == 5000
+    assert calls[1]["max_output_tokens"] == 10000
+    assert calls[0]["input"] == calls[1]["input"]
+
+
+def test_openai_provider_implement_retries_output_limit_only_once(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "implementation_max_output_tokens": 5000,
+            "implementation_retry_max_output_tokens": 10000,
+        },
+    )
+
+    calls = []
+
+    class FakeIncompleteDetails:
+        reason = "max_output_tokens"
+
+    class FakeResponse:
+        status = "incomplete"
+        incomplete_details = FakeIncompleteDetails()
+        output_text = ""
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    with pytest.raises(
+        ValueError,
+        match="implementation response was incomplete",
+    ):
+        provider.implement(
+            "implementation prompt"
+        )
+
+    assert len(calls) == 2
+    assert calls[0]["max_output_tokens"] == 5000
+    assert calls[1]["max_output_tokens"] == 10000
+
+
+def test_openai_provider_implementation_schema_requires_setup_commands(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = """
+        {
+          "task_id": "TASK-001",
+          "summary": "Done.",
+          "files": [],
+          "setup_commands": [],
+          "tests": [],
+          "blockers": []
+        }
+        """
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    provider.implement("implementation prompt")
+
+    schema = captured["text"]["format"]["schema"]
+
+    assert "setup_commands" in schema["properties"]
+    assert "setup_commands" in schema["required"]
+
+
+def test_openai_provider_rejects_invalid_implementation_setup_commands(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="setup_commands must be a list of strings",
+    ):
+        provider._parse_implementation_result(
+            """
+            {
+              "task_id": "TASK-001",
+              "summary": "Foundation generated.",
+              "files": [],
+              "setup_commands": "npm install --ignore-scripts",
+              "tests": [],
+              "blockers": []
+            }
+            """
+        )
+
+
+def test_openai_provider_parses_implementation_setup_commands(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+    )
+
+    result = provider._parse_implementation_result(
+        """
+        {
+          "task_id": "TASK-001",
+          "summary": "Foundation generated.",
+          "files": [],
+          "setup_commands": [
+            "npm install --ignore-scripts"
+          ],
+          "tests": [
+            "npm test"
+          ],
+          "blockers": []
+        }
+        """
+    )
+
+    assert result.setup_commands == [
+        "npm install --ignore-scripts"
+    ]
+
+
 def test_openai_provider_run_prompt_includes_implementation_requests(
     monkeypatch,
 ) -> None:
@@ -2117,6 +2355,142 @@ def test_openai_provider_agent_schema_allows_null_technology_proposal(
     ]
 
     assert "null" in technology_proposal_schema["type"]
+
+
+def test_openai_provider_execute_prefers_agent_max_output_tokens(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "max_output_tokens": 8000,
+            "agent_max_output_tokens": 2000,
+        },
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = """
+        {
+          "status": "COMPLETED",
+          "summary": "Done.",
+          "artifacts": [],
+          "artifact_requests": [],
+          "implementation_requests": [],
+          "questions": [],
+          "blockers": [],
+          "handoff": null,
+          "metadata": {
+            "technology_proposal": null
+          }
+        }
+        """
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    provider._execute("agent prompt")
+
+    assert captured["max_output_tokens"] == 2000
+
+
+def test_openai_provider_generate_prefers_artifact_max_output_tokens(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "max_output_tokens": 8000,
+            "artifact_max_output_tokens": 3000,
+        },
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = "# Generated Artifact\n\nContent."
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    provider.generate("artifact prompt")
+
+    assert captured["max_output_tokens"] == 3000
+
+
+def test_openai_provider_implement_prefers_implementation_max_output_tokens(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "test-key",
+    )
+
+    provider = OpenAIProvider(
+        model="test-model",
+        settings={
+            "max_output_tokens": 8000,
+            "implementation_max_output_tokens": 5000,
+        },
+    )
+
+    captured = {}
+
+    class FakeResponse:
+        status = "completed"
+        incomplete_details = None
+        output_text = """
+        {
+          "task_id": "TASK-001",
+          "summary": "Implementation completed.",
+          "files": [],
+          "tests": [],
+          "blockers": []
+        }
+        """
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+    class FakeClient:
+        responses = FakeResponses()
+
+    provider.client = FakeClient()
+
+    provider.implement("implementation prompt")
+
+    assert captured["max_output_tokens"] == 5000
 
 
 def test_openai_provider_implement_handles_rate_limit(

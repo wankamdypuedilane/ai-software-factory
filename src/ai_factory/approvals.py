@@ -1,6 +1,26 @@
 from typing import Any
 
 
+# Agents whose APPROVED status belongs to an approval. Reaching APPROVED for
+# one of them must also record the approval and activate the next agent, so
+# only the approval flow may perform that transition.
+APPROVAL_AGENT_MAP = {
+    "product_scope": "product",
+    "design": "ux_ui",
+    "architecture": "architect",
+    "development": "developer",
+    "qa": "qa",
+    "security": "security",
+    "devops": "devops",
+    "sre": "sre",
+}
+
+APPROVAL_BY_AGENT = {
+    agent_name: approval_name
+    for approval_name, agent_name in APPROVAL_AGENT_MAP.items()
+}
+
+
 VALID_APPROVALS = {
     "product_scope",
     "design",

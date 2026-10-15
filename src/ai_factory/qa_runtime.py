@@ -3,6 +3,11 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.providers import QAProvider
+from ai_factory.qa_evidence import (
+    QAEvidence,
+    describe_qa_evidence,
+    qa_evidence_satisfied,
+)
 from ai_factory.qa_prompt import build_qa_prompt
 from ai_factory.qa_result import QAResult
 from ai_factory.test_runner import (
@@ -20,14 +25,29 @@ class QAExecution:
     test_results: list[CommandExecutionResult]
 
     @property
+    def evidence(self) -> QAEvidence:
+        """What the engine observed, independently of what QA claimed."""
+
+        return describe_qa_evidence(
+            test_results=self.test_results,
+            blockers=self.result.blockers,
+            defects=self.result.defects,
+        )
+
+    @property
     def passed(self) -> bool:
+        """Whether QA succeeded, decided by executed evidence.
+
+        `result.passed` is no longer able to carry this on its own: without
+        an executed check there is nothing to be right about. It is kept as a
+        veto, so an agent reporting failure is still believed even when every
+        command it ran was green - withholding success is safe, and the
+        reason it withheld belongs in its defects or blockers.
+        """
+
         return (
-            self.result.passed
-            and all(
-                test_result.passed
-                for test_result in self.test_results
-            )
-            and not self.result.blockers
+            qa_evidence_satisfied(self.evidence)
+            and self.result.passed
         )
 
 

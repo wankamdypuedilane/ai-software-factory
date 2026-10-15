@@ -87,8 +87,10 @@ def test_update_security_gate_marks_not_ready() -> None:
         in gate["reasons"]
     )
 
+    # The gate now names the executed evidence that failed, rather than
+    # repeating a stored flag derived from it.
     assert (
-        "Security validation did not pass."
+        "Security tests failed."
         in gate["reasons"]
     )
 

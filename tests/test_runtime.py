@@ -40,6 +40,74 @@ from ai_factory.sre_result import (
 )
 
 
+def _stub_sre_validation(monkeypatch) -> None:
+    """Execute SRE's declared commands without a real runner."""
+
+    from ai_factory.test_runner import CommandExecutionResult
+
+    monkeypatch.setattr(
+        "ai_factory.sre_runtime.run_test_command",
+        lambda **kwargs: CommandExecutionResult(
+            command=kwargs["command"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
+
+
+def _stub_security_validation(monkeypatch) -> None:
+    """Execute Security's declared commands without a real runner."""
+
+    from ai_factory.test_runner import CommandExecutionResult
+
+    monkeypatch.setattr(
+        "ai_factory.security_runtime.run_test_command",
+        lambda **kwargs: CommandExecutionResult(
+            command=kwargs["command"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
+
+
+def _stub_qa_validation(monkeypatch) -> None:
+    """Execute QA's declared commands without a real runner."""
+
+    from ai_factory.test_runner import CommandExecutionResult
+
+    monkeypatch.setattr(
+        "ai_factory.qa_runtime.run_test_command",
+        lambda **kwargs: CommandExecutionResult(
+            command=kwargs["command"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
+
+
+def _stub_validation(monkeypatch) -> None:
+    """Execute declared validations without a real runner.
+
+    Every unit that changes governed files has to declare one, so these
+    workflow tests need the declared command to resolve deterministically.
+    """
+
+    from ai_factory.test_runner import CommandExecutionResult
+
+    monkeypatch.setattr(
+        "ai_factory.implementation_runtime.run_test_command",
+        lambda **kwargs: CommandExecutionResult(
+            command=kwargs["command"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
+
+
 class RuntimeTestProvider(ModelProvider):
     def run(
         self,
@@ -88,6 +156,9 @@ class QARuntimeProvider(ModelProvider, QAProvider):
         return QAResult(
             summary="QA validation completed.",
             passed=True,
+            # QA success is derived from executed evidence, so a QA agent
+            # that declares no validation can never pass.
+            test_commands=["npm run typecheck"],
         )
 
 
@@ -191,7 +262,10 @@ def test_run_next_agent_executes_selected_agent(
 
 def test_run_next_agent_executes_qa_validation(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_qa_validation(monkeypatch)
+
     factory_dir = tmp_path / ".factory"
 
     save_state(
@@ -282,7 +356,14 @@ def test_run_next_agent_executes_qa_validation(
     assert qa_last_result["qa_passed"] is True
     assert qa_last_result["qa_defects"] == []
     assert qa_last_result["qa_blockers"] == []
-    assert qa_last_result["qa_test_results"] == []
+
+    # QA now records the evidence its verdict rests on.
+    assert [
+        item["command"] for item in qa_last_result["qa_test_results"]
+    ] == ["npm run typecheck"]
+    assert all(
+        item["passed"] for item in qa_last_result["qa_test_results"]
+    )
 
 
 def test_run_next_agent_requires_qa_capable_provider(
@@ -621,7 +702,10 @@ def test_run_next_agent_marks_qa_blocked_when_qa_has_blockers(
 
 def test_run_next_agent_marks_qa_review_required_when_validation_passes(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_qa_validation(monkeypatch)
+
     factory_dir = tmp_path / ".factory"
 
     save_state(
@@ -689,6 +773,8 @@ def test_run_next_agent_marks_qa_review_required_when_validation_passes(
             return QAResult(
                 summary="QA passed.",
                 passed=True,
+                # A verdict the engine can check.
+                test_commands=["npm run typecheck"],
             )
 
     run_next_agent(
@@ -1433,7 +1519,14 @@ def test_run_next_agent_blocks_developer_when_implementation_batch_blocks(
         {
             "task_id": "US-001",
             "blockers": [
-                "Authentication requirement is ambiguous.",
+                {
+                    "message": "Authentication requirement is ambiguous.",
+                    "kind": "EXTERNAL_DEPENDENCY",
+                    "scope": "EXTERNAL",
+                    "fixable_by_agent": False,
+                    "requires_human_input": True,
+                    "blocking": True,
+                },
             ],
         }
     ]
@@ -1448,7 +1541,10 @@ def test_run_next_agent_blocks_developer_when_implementation_batch_blocks(
 
 def test_run_next_agent_skips_previously_completed_developer_tasks(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_validation(monkeypatch)
+
     factory_dir = tmp_path / ".factory"
 
     save_state(
@@ -1562,6 +1658,7 @@ def test_run_next_agent_skips_previously_completed_developer_tasks(
                             content="# rides",
                         )
                     ],
+                    tests=["npm run typecheck"],
                 )
 
             return ImplementationResult(
@@ -1573,6 +1670,7 @@ def test_run_next_agent_skips_previously_completed_developer_tasks(
                         content="# completion",
                     )
                 ],
+                tests=["npm run typecheck"],
             )
 
     provider = ResumeDeveloperProvider()
@@ -1777,7 +1875,10 @@ def test_run_next_agent_marks_developer_failed_when_tests_fail(
 
 def test_run_next_agent_uses_retry_context_for_failed_developer(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_validation(monkeypatch)
+
     factory_dir = tmp_path / ".factory"
 
     save_state(
@@ -1918,11 +2019,13 @@ def test_run_next_agent_uses_retry_context_for_failed_developer(
                 return ImplementationResult(
                     task_id="US-002",
                     summary="Ride creation fixed.",
+                    tests=["npm run typecheck"],
                 )
 
             return ImplementationResult(
                 task_id="US-003",
                 summary="Ride completion implemented.",
+                tests=["npm run typecheck"],
             )
 
     provider = RetryRuntimeProvider()
@@ -1942,7 +2045,14 @@ def test_run_next_agent_uses_retry_context_for_failed_developer(
     assert last_result["implementation_test_failed"] is False
     assert last_result["failed_task_id"] is None
     assert last_result["resume_from"] is None
-    assert last_result["test_results"] == []
+
+    # The units now declare a validation, so the retry is recorded as
+    # verified rather than as having run nothing.
+    assert last_result["test_results"]
+    assert all(
+        item["passed"] for item in last_result["test_results"]
+    )
+
     assert developer["status"] == "REVIEW_REQUIRED"
 
     assert agent_name == "developer"
@@ -1951,6 +2061,172 @@ def test_run_next_agent_uses_retry_context_for_failed_developer(
     assert "Task ID: US-001" not in provider.prompts[0]
 
     assert "Task ID: US-002" in provider.prompts[0]
+    assert "## Previous Test Failures" in provider.prompts[0]
+    assert "AssertionError" in provider.prompts[0]
+
+    assert "Task ID: US-003" in provider.prompts[1]
+    assert "## Previous Test Failures" not in provider.prompts[1]
+
+
+def test_run_next_agent_preserves_failed_task_identity_when_retry_plan_changes_id(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _stub_validation(monkeypatch)
+
+    factory_dir = tmp_path / ".factory"
+
+    save_state(
+        factory_dir / "state.yaml",
+        {
+            "project": {
+                "name": "Test Project",
+            },
+            "agents": {
+                "product": {"status": "APPROVED"},
+                "ux_ui": {"status": "APPROVED"},
+                "architect": {"status": "APPROVED"},
+                "developer": {
+                    "status": "READY",
+                    "last_result": {
+                        "failed_task_id": "US-002",
+                        "implementation_requests": [
+                            {
+                                "id": "US-001",
+                                "title": "Authentication",
+                                "purpose": "Implement authentication.",
+                            },
+                            {
+                                "id": "US-002",
+                                "title": "Ride creation",
+                                "purpose": "Implement ride creation.",
+                            },
+                            {
+                                "id": "US-003",
+                                "title": "Ride completion",
+                                "purpose": "Implement ride completion.",
+                            },
+                        ],
+                        "implementation_results": [
+                            {
+                                "task_id": "US-001",
+                                "summary": "Authentication implemented.",
+                                "tests": [],
+                                "blockers": [],
+                                "files": [
+                                    "src/auth.py",
+                                ],
+                            },
+                            {
+                                "task_id": "US-002",
+                                "summary": "Ride creation failed.",
+                                "tests": [
+                                    "python -m pytest tests/test_rides.py -q",
+                                ],
+                                "blockers": [],
+                                "files": [
+                                    "src/rides.py",
+                                ],
+                            },
+                        ],
+                        "implemented_files": [
+                            "src/auth.py",
+                            "src/rides.py",
+                        ],
+                        "test_results": [
+                            {
+                                "command": (
+                                    "python -m pytest "
+                                    "tests/test_rides.py -q"
+                                ),
+                                "returncode": 1,
+                                "passed": False,
+                                "stdout": "1 failed",
+                                "stderr": "AssertionError",
+                            }
+                        ],
+                    },
+                },
+                "qa": {"status": "NOT_STARTED"},
+                "security": {"status": "NOT_STARTED"},
+                "devops": {"status": "NOT_STARTED"},
+                "sre": {"status": "NOT_STARTED"},
+            },
+        },
+    )
+
+    save_state(
+        factory_dir / "project.yaml",
+        {
+            "schema_version": 1,
+            "project": {
+                "name": "Test Project",
+                "type": "test",
+            },
+            "technology": {
+                "selection_mode": "manual",
+                "constraints": {},
+                "selected": {},
+            },
+            "context": {
+                "agents": {
+                    "developer": [],
+                }
+            },
+        },
+    )
+
+    class RetryRuntimeProvider(DevelopmentModelProvider):
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def run(self, context) -> AgentResult:
+            return AgentResult(
+                status="COMPLETED",
+                summary="Implementation replanned.",
+                implementation_requests=[
+                    AgentImplementationRequest(
+                        id="US-002-REPAIR",
+                        title="Repair ride creation",
+                        purpose="Repair the failing ride creation implementation.",
+                    ),
+                    AgentImplementationRequest(
+                        id="US-003",
+                        title="Ride completion",
+                        purpose="Implement ride completion.",
+                    ),
+                ],
+                handoff="qa",
+            )
+
+        def implement(
+            self,
+            prompt: str,
+        ) -> ImplementationResult:
+            self.prompts.append(prompt)
+
+            if len(self.prompts) == 1:
+                return ImplementationResult(
+                    task_id="US-002",
+                    summary="Ride creation fixed.",
+                    tests=["npm run typecheck"],
+                )
+
+            return ImplementationResult(
+                task_id="US-003",
+                summary="Ride completion implemented.",
+                tests=["npm run typecheck"],
+            )
+
+    provider = RetryRuntimeProvider()
+
+    run_next_agent(
+        project_root=tmp_path,
+        provider=provider,
+    )
+
+    assert "Task ID: US-002" in provider.prompts[0]
+    assert "Task ID: US-002-REPAIR" not in provider.prompts[0]
     assert "## Previous Test Failures" in provider.prompts[0]
     assert "AssertionError" in provider.prompts[0]
 
@@ -2188,8 +2464,10 @@ def test_run_next_agent_persists_security_execution(
 
     assert security_gate["status"] == "NOT_READY"
 
+    # The gate names the deterministic cause it observed rather than
+    # repeating a stored flag derived from it.
     assert (
-        "Security validation did not pass."
+        "Security has unresolved Critical or High severity findings."
         in security_gate["reasons"]
     )
 
@@ -2347,7 +2625,10 @@ def test_run_next_agent_marks_security_blocked_when_blockers_exist(
 
 def test_run_next_agent_marks_security_review_required_when_validation_passes(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_security_validation(monkeypatch)
+
     factory_dir = tmp_path / ".factory"
 
     save_state(
@@ -2425,6 +2706,8 @@ def test_run_next_agent_marks_security_review_required_when_validation_passes(
             return SecurityResult(
                 summary="Security validation passed.",
                 passed=True,
+                # A verdict the engine can check.
+                test_commands=["npm run typecheck"],
             )
 
     run_next_agent(
@@ -2953,8 +3236,10 @@ def test_run_next_agent_marks_devops_failed_when_not_deployment_ready(
 
     assert devops_gate["status"] == "NOT_READY"
 
+    # The gate now names the deterministic conditions it observed rather
+    # than repeating a stored flag derived from them.
     assert (
-        "DevOps validation did not pass."
+        "Deployment is not ready."
         in devops_gate["reasons"]
     )
 
@@ -3368,8 +3653,10 @@ def test_run_next_agent_persists_sre_execution(
 
     assert sre_gate["status"] == "NOT_READY"
 
+    # The gate now names the deterministic conditions it observed rather
+    # than repeating a stored flag derived from them.
     assert (
-        "SRE validation did not pass."
+        "Incident readiness is not sufficient."
         in sre_gate["reasons"]
     )
 
@@ -3499,7 +3786,10 @@ def test_run_next_agent_marks_sre_blocked_when_blockers_exist(
 
 def test_run_next_agent_marks_sre_review_required_when_validation_passes(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_sre_validation(monkeypatch)
+
     factory_dir = tmp_path / ".factory"
 
     save_state(
@@ -3593,6 +3883,8 @@ def test_run_next_agent_marks_sre_review_required_when_validation_passes(
             return SREResult(
                 summary="SRE validation passed.",
                 passed=True,
+                # A readiness claim the engine can check.
+                test_commands=["npm run typecheck"],
                 observability_ready=True,
                 incident_readiness=True,
             )

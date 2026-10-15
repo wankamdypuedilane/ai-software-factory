@@ -76,7 +76,10 @@ def test_update_qa_gate_marks_not_ready() -> None:
     assert gate["status"] == "NOT_READY"
 
     assert "QA is not ready for review." in gate["reasons"]
-    assert "QA validation did not pass." in gate["reasons"]
+
+    # The gate now names the executed evidence that failed, rather than
+    # repeating a stored flag derived from it.
+    assert "QA tests failed." in gate["reasons"]
     assert "QA tests failed." in gate["reasons"]
 
     assert gate["human_approval"] is False

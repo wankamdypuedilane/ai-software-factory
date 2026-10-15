@@ -201,7 +201,18 @@ def test_sre_gate_allows_resolved_high_findings() -> None:
                 "sre_blockers": [],
                 "observability_ready": True,
                 "incident_readiness": True,
-                "sre_test_results": [],
+                # Readiness needs executed evidence as well as a resolved
+                # finding: this test is about the finding, not about
+                # clearing the gate on nothing.
+                "sre_test_results": [
+                    {
+                        "command": "npm run healthcheck",
+                        "returncode": 0,
+                        "passed": True,
+                        "stdout": "",
+                        "stderr": "",
+                    }
+                ],
                 "sre_findings": [
                     {
                         "id": "SRE-001",

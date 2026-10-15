@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 
 from ai_factory.agent_result import AgentImplementationRequest
+from ai_factory.implementation_contract import (
+    ImplementationScope,
+    ImplementationTaskKind,
+    VerificationPolicy,
+)
 
 
 @dataclass
@@ -9,6 +14,9 @@ class ImplementationTask:
     id: str
     title: str
     purpose: str
+    kind: ImplementationTaskKind | None = None
+    scope: ImplementationScope | None = None
+    verification: VerificationPolicy | None = None
 
 
 def build_implementation_tasks(
@@ -23,6 +31,9 @@ def build_implementation_tasks(
             id=request.id,
             title=request.title,
             purpose=request.purpose,
+            kind=request.kind,
+            scope=request.scope,
+            verification=request.verification,
         )
         for request in requests
     ]
