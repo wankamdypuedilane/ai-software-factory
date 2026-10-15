@@ -40,7 +40,11 @@ class FlakyQAProvider(MockProvider):
             summary="Mock QA validation passed.",
             passed=True,
             defects=[],
-            test_commands=[],
+            # The recovering attempt has to bring evidence: QA success is
+            # derived from what the engine executes, not from the claim.
+            test_commands=[
+                "python -m pytest tests/test_mock_app.py -q",
+            ],
             blockers=[],
         )
 

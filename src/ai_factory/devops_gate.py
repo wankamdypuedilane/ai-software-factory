@@ -1,3 +1,8 @@
+from ai_factory.devops_evidence import (
+    describe_devops_evidence,
+    devops_evidence_reasons,
+    devops_evidence_satisfied,
+)
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,48 +39,34 @@ def evaluate_devops_gate(
             reasons=reasons,
         )
 
-    if last_result.get("devops_blockers"):
-        reasons.append(
-            "DevOps has unresolved blockers."
-        )
-
-    if last_result.get("devops_passed") is not True:
-        reasons.append(
-            "DevOps validation did not pass."
-        )
-
-    if last_result.get("deployment_ready") is not True:
-        reasons.append(
-            "Deployment is not ready."
-        )
-
     test_results = last_result.get(
         "devops_test_results",
         [],
     )
 
-    if (
-        isinstance(test_results, list)
-        and any(
-            isinstance(item, dict)
-            and item.get("passed") is False
-            for item in test_results
-        )
-    ):
-        reasons.append(
-            "DevOps tests failed."
-        )
-
-    rollback_strategy = last_result.get(
-        "rollback_strategy"
+    # Re-derived from persisted evidence rather than trusted from the stored
+    # `devops_passed` flag. Every requirement the gate already enforced is
+    # still enforced, with the same wording; what is added is that a
+    # deployment claim must rest on something the engine executed.
+    evidence = describe_devops_evidence(
+        test_results=test_results if isinstance(test_results, list) else [],
+        blockers=last_result.get("devops_blockers", []),
+        deployment_ready=last_result.get("deployment_ready"),
+        rollback_strategy=last_result.get("rollback_strategy"),
     )
 
+    reasons.extend(
+        devops_evidence_reasons(evidence)
+    )
+
+    # The agent keeps its veto: it may report a problem over green evidence,
+    # and the gate honours that. It may not open the gate on its own.
     if (
-        not isinstance(rollback_strategy, str)
-        or not rollback_strategy.strip()
+        devops_evidence_satisfied(evidence)
+        and last_result.get("devops_passed") is not True
     ):
         reasons.append(
-            "Rollback strategy is missing."
+            "DevOps validation did not pass."
         )
 
     return DevOpsGateEvaluation(

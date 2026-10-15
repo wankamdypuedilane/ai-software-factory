@@ -4,6 +4,11 @@ from typing import Any
 from ai_factory.agent_result import (
     AgentImplementationRequest,
 )
+from ai_factory.implementation_contract import (
+    coerce_scope,
+    coerce_task_kind,
+    coerce_verification_policy,
+)
 
 
 @dataclass
@@ -63,6 +68,33 @@ def build_implementation_retry_context(
             break
 
     if failed_request is None:
+        implementation_results = last_result.get(
+            "implementation_results",
+            [],
+        )
+
+        for item in implementation_results:
+            if not isinstance(item, dict):
+                continue
+
+            if item.get("task_id") == failed_task_id:
+                failed_request = {
+                    "id": failed_task_id,
+                    "title": item.get(
+                        "title",
+                        failed_task_id,
+                    ),
+                    "purpose": item.get(
+                        "purpose",
+                        item.get(
+                            "summary",
+                            f"Repair failed task {failed_task_id}.",
+                        ),
+                    ),
+                }
+                break
+
+    if failed_request is None:
         raise ValueError(
             f"Failed implementation task not found: {failed_task_id}"
         )
@@ -102,6 +134,15 @@ def build_implementation_retry_context(
             id=failed_task_id,
             title=title,
             purpose=purpose,
+            kind=coerce_task_kind(
+                failed_request.get("kind")
+            ),
+            scope=coerce_scope(
+                failed_request.get("scope")
+            ),
+            verification=coerce_verification_policy(
+                failed_request.get("verification")
+            ),
         ),
         test_results=failed_test_results,
     )

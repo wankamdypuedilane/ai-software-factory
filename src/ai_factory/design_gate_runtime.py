@@ -1,6 +1,33 @@
 from typing import Any
 
 from ai_factory.agent_result import AgentResult
+from ai_factory.blocker_contract import (
+    blocker_messages,
+    blocking_blockers,
+    coerce_blockers,
+)
+
+
+def _unresolved_messages(
+    gate: dict[str, Any],
+    blockers: list[Any],
+) -> list[str]:
+    """Return blocking messages the human has not already resolved."""
+
+    resolved = gate.get("resolved_blockers", [])
+
+    if not isinstance(resolved, list):
+        resolved = []
+
+    return [
+        message
+        for message in blocker_messages(
+            blocking_blockers(
+                coerce_blockers(blockers)
+            )
+        )
+        if message not in resolved
+    ]
 
 
 def update_design_gate_from_result(
@@ -32,14 +59,17 @@ def update_design_gate_from_result(
         }
     }
 
-    gate["external_blockers"] = list(
-        result.blockers
+    unresolved = _unresolved_messages(
+        gate,
+        result.blockers,
     )
+
+    gate["external_blockers"] = unresolved
 
     if (
         requested_total > 0
         and generated_total == requested_total
-        and not result.blockers
+        and not unresolved
     ):
         gate["status"] = "READY_FOR_REVIEW"
     else:
@@ -118,12 +148,17 @@ def rebuild_design_gate_from_state(
         }
     }
 
-    gate["external_blockers"] = list(blockers)
+    unresolved = _unresolved_messages(
+        gate,
+        blockers,
+    )
+
+    gate["external_blockers"] = unresolved
 
     deliverables_ready = (
         requested_total > 0
         and generated_total == requested_total
-        and not blockers
+        and not unresolved
     )
 
     approvals = state.get(

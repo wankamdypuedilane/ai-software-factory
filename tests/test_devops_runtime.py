@@ -67,8 +67,11 @@ def test_run_devops_validation_builds_prompt_and_returns_result(
     assert "# DevOps Validation" in execution.prompt
     assert "src/app.py" in execution.prompt
 
+    # This response declares no check, so the engine observed nothing and
+    # cannot confirm deployment readiness.
     assert execution.test_results == []
-    assert execution.passed is True
+    assert execution.evidence.executed_checks == 0
+    assert execution.passed is False
 
 
 def test_run_devops_validation_executes_declared_tests(

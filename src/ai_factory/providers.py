@@ -9,6 +9,11 @@ from ai_factory.agent_result import (
 from ai_factory.devops_result import (
     DevOpsResult,
 )
+from ai_factory.implementation_contract import (
+    ImplementationScope,
+    ImplementationTaskKind,
+    VerificationPolicy,
+)
 from ai_factory.implementation_provider import (
     ImplementationProvider,
 )
@@ -223,6 +228,12 @@ class MockProvider(
                             "Create a minimal deterministic "
                             "application for local Factory execution."
                         ),
+                        kind=ImplementationTaskKind.IMPLEMENTATION,
+                        scope=ImplementationScope.TASK,
+                        verification=VerificationPolicy(
+                            allow_full_suite=False,
+                            baseline_required=True,
+                        ),
                     ),
                 ],
             )
@@ -275,8 +286,26 @@ class MockProvider(
                         '    return "ok"\n'
                     ),
                 ),
+                # The mock models a well-formed agent, and a unit that
+                # writes governed files must say what verifies them.
+                ImplementationFileChange(
+                    path="tests/test_mock_app.py",
+                    content=(
+                        "import sys\n"
+                        "\n"
+                        'sys.path.insert(0, "src")\n'
+                        "\n"
+                        "from mock_app import healthcheck\n"
+                        "\n"
+                        "\n"
+                        "def test_healthcheck() -> None:\n"
+                        '    assert healthcheck() == "ok"\n'
+                    ),
+                ),
             ],
-            tests=[],
+            tests=[
+                "python -m pytest tests/test_mock_app.py -q",
+            ],
             blockers=[],
         )
 
@@ -290,7 +319,12 @@ class MockProvider(
             summary="Mock QA validation passed.",
             passed=True,
             defects=[],
-            test_commands=[],
+            # The mock models a well-formed QA agent: it declares the
+            # validation the engine executes, because a claim the engine
+            # cannot execute never passes QA.
+            test_commands=[
+                "python -m pytest tests/test_mock_app.py -q",
+            ],
             blockers=[],
         )
 
@@ -306,7 +340,12 @@ class MockProvider(
             ),
             passed=True,
             findings=[],
-            test_commands=[],
+            # The mock models a well-formed security agent: it declares the
+            # validation the engine executes, because a claim the engine
+            # cannot execute never clears the security phase.
+            test_commands=[
+                "python -m pytest tests/test_mock_app.py -q",
+            ],
             blockers=[],
         )
 
@@ -322,7 +361,12 @@ class MockProvider(
             ),
             passed=True,
             changes=[],
-            test_commands=[],
+            # The mock models a well-formed DevOps agent: it declares the
+            # validation the engine executes, because a deployment claim
+            # the engine cannot check never opens the gate.
+            test_commands=[
+                "python -m pytest tests/test_mock_app.py -q",
+            ],
             blockers=[],
             deployment_ready=True,
             rollback_strategy=(
@@ -340,7 +384,12 @@ class MockProvider(
             summary="Mock SRE validation passed.",
             passed=True,
             findings=[],
-            test_commands=[],
+            # The mock models a well-formed SRE agent: it declares the
+            # validation the engine executes, because a production-readiness
+            # claim the engine cannot check never opens the gate.
+            test_commands=[
+                "python -m pytest tests/test_mock_app.py -q",
+            ],
             blockers=[],
             observability_ready=True,
             incident_readiness=True,

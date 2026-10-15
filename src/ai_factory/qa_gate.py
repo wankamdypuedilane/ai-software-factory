@@ -1,3 +1,8 @@
+from ai_factory.qa_evidence import (
+    describe_qa_evidence,
+    qa_evidence_reasons,
+    qa_evidence_satisfied,
+)
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,53 +39,40 @@ def evaluate_qa_gate(
             reasons=reasons,
         )
 
-    if last_result.get("qa_blockers"):
-        reasons.append(
-            "QA has unresolved blockers."
-        )
-
-    if last_result.get("qa_passed") is not True:
-        reasons.append(
-            "QA validation did not pass."
-        )
-
     test_results = last_result.get(
         "qa_test_results",
         [],
     )
-
-    if (
-        isinstance(test_results, list)
-        and any(
-            isinstance(item, dict)
-            and item.get("passed") is False
-            for item in test_results
-        )
-    ):
-        reasons.append(
-            "QA tests failed."
-        )
 
     defects = last_result.get(
         "qa_defects",
         [],
     )
 
-    if isinstance(defects, list):
-        blocking_severities = {
-            "Critical",
-            "High",
-        }
+    # Re-derived from the persisted evidence rather than trusted from the
+    # stored `qa_passed` flag. The runtime already decides the same way, so
+    # this changes nothing for a state this engine wrote - and it refuses a
+    # state written by an older engine, restored, or edited by hand, where
+    # the flag could assert a success no executed check supports.
+    evidence = describe_qa_evidence(
+        test_results=test_results if isinstance(test_results, list) else [],
+        blockers=last_result.get("qa_blockers", []),
+        defects=defects if isinstance(defects, list) else [],
+    )
 
-        if any(
-            isinstance(defect, dict)
-            and defect.get("severity")
-            in blocking_severities
-            for defect in defects
-        ):
-            reasons.append(
-                "QA has unresolved Critical or High severity defects."
-            )
+    reasons.extend(
+        qa_evidence_reasons(evidence)
+    )
+
+    # The agent keeps its veto: it may report failure over green checks, and
+    # the gate honours that. It may not open the gate on its own.
+    if (
+        qa_evidence_satisfied(evidence)
+        and last_result.get("qa_passed") is not True
+    ):
+        reasons.append(
+            "QA validation did not pass."
+        )
 
     return QAGateEvaluation(
         ready=not reasons,

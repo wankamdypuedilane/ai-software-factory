@@ -17,6 +17,12 @@ design:
 artifacts:
   ux_ui: []
 
+dependencies:
+  # Packages allowed to run their own install lifecycle scripts, by name.
+  # Everything else installs with scripts disabled. Only a human edits this
+  # list: no agent path writes to this file.
+  native_builds: []
+
 technology:
   selection_mode: recommend
 

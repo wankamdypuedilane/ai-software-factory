@@ -16,6 +16,39 @@ from ai_factory.devops_gate_runtime import (
 from ai_factory.devops_runtime import (
     run_devops_validation,
 )
+from ai_factory.replan_guard import (
+    assert_replan_budget,
+    build_failure_signature,
+    get_failure_signature,
+    get_repeated_failures,
+    get_replan_count,
+    next_repeated_failures,
+    next_replan_count,
+)
+from ai_factory.qa_retry_guard import (
+    advance_qa_retry_state,
+    assert_qa_retry_budget,
+    get_qa_failure_signature,
+    get_qa_repeated_failures,
+    get_qa_retry_count,
+)
+from ai_factory.security_retry_guard import (
+    advance_security_retry_state,
+    assert_security_retry_budget,
+    get_security_failure_signature,
+    get_security_repeated_failures,
+    get_security_retry_count,
+)
+from ai_factory.devops_retry_guard import (
+    advance_devops_retry_state,
+    assert_devops_retry_budget,
+    get_devops_failure_signature,
+    get_devops_repeated_failures,
+    get_devops_retry_count,
+)
+from ai_factory.blocker_contract import (
+    serialize_blockers,
+)
 from ai_factory.implementation_batch import (
     run_implementation_batch,
 )
@@ -55,6 +88,13 @@ from ai_factory.sre_runtime import (
 )
 from ai_factory.sre_gate_runtime import (
     update_sre_gate_from_state,
+)
+from ai_factory.sre_retry_guard import (
+    advance_sre_retry_state,
+    assert_sre_retry_budget,
+    get_sre_failure_signature,
+    get_sre_repeated_failures,
+    get_sre_retry_count,
 )
 from ai_factory.state import load_state, save_state
 from ai_factory.test_result_serialization import (
@@ -133,6 +173,28 @@ def run_next_agent(
         raise ValueError(
             "No agent is currently ready for execution."
         )
+
+    if agent_name == "developer":
+        # Checked before any provider call: an exhausted budget costs
+        # nothing, and the persisted diagnostics stay untouched.
+        assert_replan_budget(state)
+
+    if agent_name == "qa":
+        # Same guarantee for QA, which `get_next_agent` also re-selects
+        # after a failure and which had no bound of its own.
+        assert_qa_retry_budget(state)
+
+    if agent_name == "security":
+        assert_security_retry_budget(state)
+
+    if agent_name == "devops":
+        assert_devops_retry_budget(state)
+
+    if agent_name == "sre":
+        # The last downstream validation agent `get_next_agent` re-selects
+        # after a failure. Checked here, before `run_agent`, so an exhausted
+        # budget costs neither an agent run nor an SRE validation call.
+        assert_sre_retry_budget(state)
 
     result = run_agent(
         project_root=project_root,
@@ -411,6 +473,37 @@ def run_next_agent(
 
     implementation_batch = None
 
+    # `apply_agent_result` replaces last_result wholesale, so the previous
+    # cycle's history has to be read before it is destroyed. It is the only
+    # moment where the previous and the new cycle are both knowable.
+    previous_replan_count = get_replan_count(state)
+    previous_failure_signature = get_failure_signature(state)
+    previous_repeated_failures = get_repeated_failures(state)
+
+    previous_qa_retry_count = get_qa_retry_count(state)
+    previous_qa_failure_signature = get_qa_failure_signature(state)
+    previous_qa_repeated_failures = get_qa_repeated_failures(state)
+
+    previous_security_retry_count = get_security_retry_count(state)
+    previous_security_failure_signature = (
+        get_security_failure_signature(state)
+    )
+    previous_security_repeated_failures = (
+        get_security_repeated_failures(state)
+    )
+
+    previous_devops_retry_count = get_devops_retry_count(state)
+    previous_devops_failure_signature = (
+        get_devops_failure_signature(state)
+    )
+    previous_devops_repeated_failures = (
+        get_devops_repeated_failures(state)
+    )
+
+    previous_sre_retry_count = get_sre_retry_count(state)
+    previous_sre_failure_signature = get_sre_failure_signature(state)
+    previous_sre_repeated_failures = get_sre_repeated_failures(state)
+
     if agent_name == "developer":
         completed_task_ids = (
             get_completed_implementation_task_ids(
@@ -419,11 +512,15 @@ def run_next_agent(
         )
 
         retry_task_id = None
+        retry_task = None
         retry_test_results = None
 
         if developer_retry_context is not None:
             retry_task_id = (
                 developer_retry_context.task.id
+            )
+            retry_task = (
+                developer_retry_context.task
             )
             retry_test_results = (
                 developer_retry_context.test_results
@@ -437,6 +534,7 @@ def run_next_agent(
             provider=provider,
             completed_task_ids=completed_task_ids,
             retry_task_id=retry_task_id,
+            retry_task=retry_task,
             retry_test_results=retry_test_results,
         )
 
@@ -527,7 +625,7 @@ def run_next_agent(
             for defect in qa_result.defects
         ]
 
-        qa_last_result["qa_blockers"] = list(
+        qa_last_result["qa_blockers"] = serialize_blockers(
             qa_result.blockers
         )
 
@@ -535,6 +633,18 @@ def run_next_agent(
             serialize_test_results(
                 qa_execution.test_results
             )
+        )
+
+        # Recorded before the status is chosen, so a bounded stop keeps the
+        # evidence, the defects and the blockers of the cycle that spent the
+        # budget. A successful cycle clears the history, so an unrelated
+        # future QA run never inherits a stale non-convergence state.
+        advance_qa_retry_state(
+            qa_last_result,
+            previous_count=previous_qa_retry_count,
+            previous_signature=previous_qa_failure_signature,
+            previous_repeated=previous_qa_repeated_failures,
+            cycle_failed=not qa_execution.passed,
         )
 
         if qa_result.blockers:
@@ -594,7 +704,7 @@ def run_next_agent(
             for finding in security_result.findings
         ]
 
-        security_last_result["security_blockers"] = list(
+        security_last_result["security_blockers"] = serialize_blockers(
             security_result.blockers
         )
 
@@ -602,6 +712,18 @@ def run_next_agent(
             "security_test_results"
         ] = serialize_test_results(
             security_execution.test_results
+        )
+
+        # Recorded before the status is chosen, so a bounded stop keeps the
+        # evidence, the findings and the blockers of the cycle that spent
+        # the budget. A successful cycle clears the history, so a later
+        # unrelated Security run never inherits a stale state.
+        advance_security_retry_state(
+            security_last_result,
+            previous_count=previous_security_retry_count,
+            previous_signature=previous_security_failure_signature,
+            previous_repeated=previous_security_repeated_failures,
+            cycle_failed=not security_execution.passed,
         )
 
         if security_result.blockers:
@@ -650,7 +772,7 @@ def run_next_agent(
             for change in devops_result.changes
         ]
 
-        devops_last_result["devops_blockers"] = list(
+        devops_last_result["devops_blockers"] = serialize_blockers(
             devops_result.blockers
         )
 
@@ -666,6 +788,18 @@ def run_next_agent(
 
         devops_last_result["rollback_strategy"] = (
             devops_result.rollback_strategy
+        )
+
+        # Recorded before the status is chosen, so a bounded stop keeps the
+        # evidence, the deployment flag, the rollback strategy and the
+        # blockers of the cycle that spent the budget. A successful cycle
+        # clears the history.
+        advance_devops_retry_state(
+            devops_last_result,
+            previous_count=previous_devops_retry_count,
+            previous_signature=previous_devops_failure_signature,
+            previous_repeated=previous_devops_repeated_failures,
+            cycle_failed=not devops_execution.passed,
         )
 
         if devops_result.blockers:
@@ -718,7 +852,7 @@ def run_next_agent(
             for finding in sre_result.findings
         ]
 
-        sre_last_result["sre_blockers"] = list(
+        sre_last_result["sre_blockers"] = serialize_blockers(
             sre_result.blockers
         )
 
@@ -735,6 +869,19 @@ def run_next_agent(
         sre_last_result[
             "incident_readiness"
         ] = sre_result.incident_readiness
+
+        # Recorded before the status is chosen, so a bounded stop keeps the
+        # evidence, the findings, the blockers and both readiness flags of
+        # the cycle that spent the budget. A successful cycle clears the
+        # history, so a later independent SRE run never inherits a stale
+        # non-convergence state.
+        advance_sre_retry_state(
+            sre_last_result,
+            previous_count=previous_sre_retry_count,
+            previous_signature=previous_sre_failure_signature,
+            previous_repeated=previous_sre_repeated_failures,
+            cycle_failed=not sre_execution.passed,
+        )
 
         if sre_result.blockers:
             sre_state["status"] = "BLOCKED"
@@ -761,7 +908,7 @@ def run_next_agent(
                 "task_id": item.task_id,
                 "summary": item.summary,
                 "tests": list(item.tests),
-                "blockers": list(item.blockers),
+                "blockers": serialize_blockers(item.blockers),
                 "files": [
                     change.path
                     for change in item.files
@@ -817,11 +964,36 @@ def run_next_agent(
         developer_result["implementation_blockers"] = [
             {
                 "task_id": item.task_id,
-                "blockers": list(item.blockers),
+                "blockers": serialize_blockers(item.blockers),
             }
             for item in implementation_batch.results
             if item.blockers
         ]
+
+        cycle_failed = (
+            implementation_batch.blocked
+            or implementation_batch.test_failed
+        )
+
+        new_failure_signature = (
+            build_failure_signature(developer_result)
+            if cycle_failed
+            else ""
+        )
+
+        developer_result["replan_count"] = next_replan_count(
+            previous_replan_count,
+            failed=cycle_failed,
+        )
+
+        developer_result["failure_signature"] = new_failure_signature
+
+        # The only place two distinct cycles are both known.
+        developer_result["repeated_failures"] = next_repeated_failures(
+            previous_repeated_failures,
+            previous_failure_signature,
+            new_failure_signature,
+        )
 
         developer_result["resume_from"] = None
 

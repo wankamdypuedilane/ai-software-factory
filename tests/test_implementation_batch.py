@@ -7,10 +7,40 @@ from ai_factory.agent_result import (
 from ai_factory.implementation_batch import (
     run_implementation_batch,
 )
+from ai_factory.test_runner import (
+    CommandExecutionResult,
+)
 from ai_factory.implementation_result import (
     ImplementationFileChange,
     ImplementationResult,
 )
+
+
+def _stub_validation(monkeypatch) -> list[str]:
+    """Run declared validations without invoking a real test runner.
+
+    Every unit here has to declare one: a unit that changes governed files
+    and validates nothing is refused by the runtime.
+    """
+
+    executed: list[str] = []
+
+    def fake_test(project_root, command, **_):
+        executed.append(command)
+
+        return CommandExecutionResult(
+            command=command,
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "ai_factory.implementation_runtime.run_test_command",
+        fake_test,
+    )
+
+    return executed
 
 
 class FakeImplementationProvider:
@@ -31,7 +61,10 @@ class FakeImplementationProvider:
 
 def test_run_implementation_batch_executes_tasks_sequentially(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    executed = _stub_validation(monkeypatch)
+
     agent_result = AgentResult(
         status="COMPLETED",
         summary="Implementation planned.",
@@ -60,6 +93,7 @@ def test_run_implementation_batch_executes_tasks_sequentially(
                         content="# auth",
                     )
                 ],
+                tests=["npm run typecheck"],
             ),
             ImplementationResult(
                 task_id="US-002",
@@ -70,6 +104,7 @@ def test_run_implementation_batch_executes_tasks_sequentially(
                         content="# rides",
                     )
                 ],
+                tests=["npm run typecheck"],
             ),
         ]
     )
@@ -85,7 +120,7 @@ def test_run_implementation_batch_executes_tasks_sequentially(
     assert len(batch.results) == 2
     assert len(batch.written_files) == 2
     assert batch.blocked is False
-    assert batch.test_results == []
+    assert executed == ["npm run typecheck"] * 4
 
     assert batch.results[0].task_id == "US-001"
     assert batch.results[1].task_id == "US-002"
@@ -97,7 +132,10 @@ def test_run_implementation_batch_executes_tasks_sequentially(
 
 def test_run_implementation_batch_stops_after_blocker(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_validation(monkeypatch)
+
     agent_result = AgentResult(
         status="COMPLETED",
         summary="Implementation planned.",
@@ -125,6 +163,7 @@ def test_run_implementation_batch_stops_after_blocker(
             ImplementationResult(
                 task_id="US-001",
                 summary="Authentication implemented.",
+                tests=["npm run typecheck"],
             ),
             ImplementationResult(
                 task_id="US-002",
@@ -153,9 +192,9 @@ def test_run_implementation_batch_stops_after_blocker(
     assert len(provider.prompts) == 2
 
     assert batch.results[-1].task_id == "US-002"
-    assert batch.results[-1].blockers == [
+    assert batch.results[-1].blockers[0].message == (
         "Ride state requirement is ambiguous."
-    ]
+    )
 
 
 def test_run_implementation_batch_handles_no_requests(
@@ -268,7 +307,10 @@ def test_run_implementation_batch_stops_when_tests_fail(
 
 def test_run_implementation_batch_passes_retry_diagnostics_only_to_failed_task(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_validation(monkeypatch)
+
     agent_result = AgentResult(
         status="COMPLETED",
         summary="Implementation planned.",
@@ -296,10 +338,12 @@ def test_run_implementation_batch_passes_retry_diagnostics_only_to_failed_task(
             ImplementationResult(
                 task_id="US-002",
                 summary="Ride creation fixed.",
+                tests=["npm run typecheck"],
             ),
             ImplementationResult(
                 task_id="US-003",
                 summary="Ride completion implemented.",
+                tests=["npm run typecheck"],
             ),
         ]
     )
@@ -343,9 +387,92 @@ def test_run_implementation_batch_passes_retry_diagnostics_only_to_failed_task(
     assert "## Previous Test Failures" not in second_prompt
 
 
+def test_run_implementation_batch_preserves_failed_task_on_retry_when_replanned_id_changes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _stub_validation(monkeypatch)
+
+    agent_result = AgentResult(
+        status="COMPLETED",
+        summary="Implementation replanned.",
+        implementation_requests=[
+            AgentImplementationRequest(
+                id="TASKFLOW-DEV-HTTP-REPAIR",
+                title="Repair shared HTTP utilities",
+                purpose="Repair the failing shared HTTP implementation.",
+            ),
+            AgentImplementationRequest(
+                id="TASKFLOW-DEV-PERSISTENCE",
+                title="Persistence",
+                purpose="Implement persistence.",
+            ),
+        ],
+    )
+
+    provider = FakeImplementationProvider(
+        [
+            ImplementationResult(
+                task_id="TASKFLOW-DEV-HTTP-FIX",
+                summary="HTTP implementation repaired.",
+                tests=["npm run typecheck"],
+            ),
+            ImplementationResult(
+                task_id="TASKFLOW-DEV-PERSISTENCE",
+                summary="Persistence implemented.",
+                tests=["npm run typecheck"],
+            ),
+        ]
+    )
+
+    retry_task = AgentImplementationRequest(
+        id="TASKFLOW-DEV-HTTP-FIX",
+        title="Fix shared HTTP utilities",
+        purpose="Fix the failing shared HTTP implementation.",
+    )
+
+    batch = run_implementation_batch(
+        project_root=tmp_path,
+        agent_name="developer",
+        agent_result=agent_result,
+        context={},
+        provider=provider,
+        completed_task_ids=set(),
+        retry_task=retry_task,
+        retry_test_results=[
+            {
+                "command": "npm test",
+                "returncode": 1,
+                "passed": False,
+                "stdout": "3 failed",
+                "stderr": "AssertionError",
+            }
+        ],
+    )
+
+    assert len(provider.prompts) == 2
+
+    first_prompt = provider.prompts[0]
+    second_prompt = provider.prompts[1]
+
+    assert "Task ID: TASKFLOW-DEV-HTTP-FIX" in first_prompt
+    assert "## Previous Test Failures" in first_prompt
+    assert "AssertionError" in first_prompt
+
+    assert "Task ID: TASKFLOW-DEV-HTTP-REPAIR" not in first_prompt
+
+    assert "Task ID: TASKFLOW-DEV-PERSISTENCE" in second_prompt
+    assert "## Previous Test Failures" not in second_prompt
+
+    assert batch.results[0].task_id == "TASKFLOW-DEV-HTTP-FIX"
+
+
 def test_run_implementation_batch_skips_completed_tasks(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    _stub_validation(monkeypatch)
+
     agent_result = AgentResult(
         status="COMPLETED",
         summary="Implementation planned.",
@@ -373,10 +500,12 @@ def test_run_implementation_batch_skips_completed_tasks(
             ImplementationResult(
                 task_id="US-002",
                 summary="Ride creation implemented.",
+                tests=["npm run typecheck"],
             ),
             ImplementationResult(
                 task_id="US-003",
                 summary="Ride completion implemented.",
+                tests=["npm run typecheck"],
             ),
         ]
     )

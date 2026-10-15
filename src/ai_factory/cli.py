@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 
 from ai_factory.approval_runtime import apply_approval
@@ -10,7 +11,28 @@ from ai_factory.orchestrator import (
     get_execution_blocker,
     get_next_agent,
 )
+from ai_factory.replan_guard import (
+    BUDGETED_AGENTS,
+    MAX_DEVELOPER_REPLANS,
+    budget_limit,
+    get_budget_counters,
+    reset_replan_budget,
+)
+from ai_factory.factory_checkpoint import (
+    CheckpointError,
+    create_checkpoint,
+    list_checkpoints,
+    restore_checkpoint,
+)
+from ai_factory.blocker_recovery import (
+    GATE_BY_APPROVAL,
+    resolve_gate_blockers,
+)
 from ai_factory.project import initialize_project
+from ai_factory.provider_errors import (
+    ProviderExecutionError,
+    ProviderResultError,
+)
 from ai_factory.provider_factory import create_provider
 from ai_factory.result_renderer import render_agent_result
 from ai_factory.resume import resume_agent_with_input
@@ -31,6 +53,24 @@ from ai_factory.technology_selection import (
     apply_approved_technology_to_config,
 )
 from ai_factory.transitions import retry_agent, set_agent_status
+
+
+# A provider failure is not a command-line mistake. Reporting one through
+# `parser.error` printed the usage banner and exit code 2, which told the
+# operator to check their typing about a run that had actually reached the
+# model. These failures keep their own exit code and say what to do next.
+PROVIDER_FAILURE_EXIT_CODE = 4
+
+
+def _exit_on_provider_failure(
+    error: ValueError,
+) -> None:
+    print(
+        f"Provider failure: {error}",
+        file=sys.stderr,
+    )
+
+    raise SystemExit(PROVIDER_FAILURE_EXIT_CODE)
 
 
 def show_status(project_root: Path) -> None:
@@ -196,6 +236,16 @@ def main() -> None:
         help="Agent to retry",
     )
 
+    retry_parser.add_argument(
+        "--reset-replan-budget",
+        action="store_true",
+        help=(
+            "Deliberately authorize a new bounded replanning window after "
+            "the Factory stopped a non-converging search. Diagnostics are "
+            "preserved and the reset is recorded in the project state."
+        ),
+    )
+
     set_status_parser = subparsers.add_parser(
         "set-status",
         help="Update the status of an agent",
@@ -219,6 +269,63 @@ def main() -> None:
     approve_parser.add_argument(
         "approval_name",
         help="Approval to record",
+    )
+
+    resolve_parser = subparsers.add_parser(
+        "resolve-blocker",
+        help=(
+            "Record that a gate's external blockers were resolved "
+            "outside the Factory"
+        ),
+    )
+
+    resolve_parser.add_argument(
+        "approval_name",
+        help="Approval owning the gate to unblock",
+    )
+
+    checkpoint_parser = subparsers.add_parser(
+        "checkpoint",
+        help="Capture and restore reproducible workflow milestones",
+    )
+
+    checkpoint_subparsers = checkpoint_parser.add_subparsers(
+        dest="checkpoint_command",
+        required=True,
+    )
+
+    checkpoint_create_parser = checkpoint_subparsers.add_parser(
+        "create",
+        help="Capture the current workflow milestone",
+    )
+
+    checkpoint_create_parser.add_argument(
+        "name",
+        help="Checkpoint name",
+    )
+
+    checkpoint_subparsers.add_parser(
+        "list",
+        help="List the checkpoints stored for this project",
+    )
+
+    checkpoint_restore_parser = checkpoint_subparsers.add_parser(
+        "restore",
+        help="Return the project to a stored milestone",
+    )
+
+    checkpoint_restore_parser.add_argument(
+        "name",
+        help="Checkpoint name",
+    )
+
+    checkpoint_restore_parser.add_argument(
+        "--allow-engine-change",
+        action="store_true",
+        help=(
+            "Restore even though the engine changed since the "
+            "checkpoint was created"
+        ),
     )
 
     design_parser = subparsers.add_parser(
@@ -313,6 +420,12 @@ def main() -> None:
                 )
             )
 
+        except (
+            ProviderResultError,
+            ProviderExecutionError,
+        ) as error:
+            _exit_on_provider_failure(error)
+
         except ValueError as error:
             parser.error(str(error))
 
@@ -383,6 +496,12 @@ def main() -> None:
                     "No agent is currently ready for execution."
                 )
 
+        except (
+            ProviderResultError,
+            ProviderExecutionError,
+        ) as error:
+            _exit_on_provider_failure(error)
+
         except ValueError as error:
             parser.error(str(error))
 
@@ -421,19 +540,58 @@ def main() -> None:
         state = load_state(state_path)
 
         try:
-            state = retry_agent(
-                state,
-                args.agent_name,
-            )
+            if args.reset_replan_budget:
+                # Read through the shared registry rather than the
+                # Developer's own counter: five agents are budgeted now, and
+                # reporting the Developer's count and limit for an SRE reset
+                # would describe a window that was never opened.
+                previous = 0
+                limit = MAX_DEVELOPER_REPLANS
 
-            save_state(
-                state_path,
-                state,
-            )
+                if args.agent_name in BUDGETED_AGENTS:
+                    previous, _, _ = get_budget_counters(
+                        state,
+                        args.agent_name,
+                    )
+                    limit = budget_limit(args.agent_name)
 
-            print(
-                f"Agent '{args.agent_name}' reset to READY for retry."
-            )
+                state = reset_replan_budget(
+                    state,
+                    args.agent_name,
+                    source="cli:retry --reset-replan-budget",
+                )
+
+                save_state(
+                    state_path,
+                    state,
+                )
+
+                print(
+                    f"Agent '{args.agent_name}': a new replanning budget "
+                    f"was opened ({previous} previous cycles cleared, "
+                    f"limit {limit})."
+                )
+                print(
+                    "  Diagnostics from the last failed cycle were kept."
+                )
+                print(
+                    "  The reset is recorded in the project state."
+                )
+
+            else:
+                state = retry_agent(
+                    state,
+                    args.agent_name,
+                )
+
+                save_state(
+                    state_path,
+                    state,
+                )
+
+                print(
+                    f"Agent '{args.agent_name}' reset to READY for retry."
+                )
 
         except (ValueError, KeyError) as error:
             parser.error(str(error))
@@ -477,6 +635,93 @@ def main() -> None:
             )
 
         except ValueError as error:
+            parser.error(str(error))
+
+    elif args.command == "resolve-blocker":
+        state_path = Path.cwd() / ".factory" / "state.yaml"
+        state = load_state(state_path)
+
+        try:
+            resolved = list(
+                state.get(
+                    GATE_BY_APPROVAL.get(
+                        args.approval_name,
+                        "",
+                    ),
+                    {},
+                ).get("external_blockers", [])
+            )
+
+            state = resolve_gate_blockers(
+                state,
+                args.approval_name,
+            )
+
+            save_state(state_path, state)
+
+            print(
+                f"Resolved {len(resolved)} external blocker(s) on "
+                f"the {args.approval_name} gate:"
+            )
+
+            for message in resolved:
+                print(f"  - {message}")
+
+        except ValueError as error:
+            parser.error(str(error))
+
+    elif args.command == "checkpoint":
+        project_root = Path.cwd()
+
+        try:
+            if args.checkpoint_command == "create":
+                metadata = create_checkpoint(
+                    project_root,
+                    args.name,
+                )
+
+                print(
+                    f"Checkpoint created: {metadata.name}"
+                )
+                print(f"  phase       : {metadata.phase}")
+                print(f"  files       : {metadata.file_count}")
+                print(f"  created at  : {metadata.created_at}")
+
+            elif args.checkpoint_command == "list":
+                checkpoints = list_checkpoints(project_root)
+
+                if not checkpoints:
+                    print("No checkpoint stored for this project.")
+                else:
+                    for metadata in checkpoints:
+                        print(
+                            f"{metadata.name:<28}"
+                            f"{metadata.phase:<16}"
+                            f"{metadata.file_count:>5} files  "
+                            f"{metadata.created_at}"
+                        )
+
+            elif args.checkpoint_command == "restore":
+                report = restore_checkpoint(
+                    project_root,
+                    args.name,
+                    allow_engine_change=args.allow_engine_change,
+                )
+
+                print(
+                    f"Checkpoint restored: {report.metadata.name}"
+                )
+                print(f"  files restored : {report.restored_files}")
+                print(
+                    "  dependencies   : "
+                    + (
+                        "reusable"
+                        if report.dependencies_compatible
+                        else "stale, reinstall before running commands"
+                    )
+                )
+
+        except CheckpointError as error:
             parser.error(str(error))
 
     elif args.command == "design":

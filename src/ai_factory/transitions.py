@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+from ai_factory.approvals import APPROVAL_BY_AGENT
 from ai_factory.design_gate import is_design_gate_ready
 from ai_factory.phases import (
     update_project_phase,
@@ -31,8 +32,15 @@ def set_agent_status(
     agent_name: str,
     status: str,
     project_root: Path | None = None,
+    via_approval: bool = False,
 ) -> dict[str, Any]:
-    """Update an agent status if the workflow transition is allowed."""
+    """Update an agent status if the workflow transition is allowed.
+
+    Reaching APPROVED for an agent owned by an approval also has to record
+    that approval and activate the next agent. Since APPROVED is terminal,
+    performing the transition alone would strand the workflow permanently,
+    so only the approval flow may do it.
+    """
 
     if status not in VALID_STATUSES:
         raise ValueError(f"Invalid status: {status}")
@@ -41,6 +49,20 @@ def set_agent_status(
 
     if agent_name not in agents:
         raise KeyError(f"Unknown agent: {agent_name}")
+
+    if (
+        status == "APPROVED"
+        and not via_approval
+        and agent_name in APPROVAL_BY_AGENT
+    ):
+        approval_name = APPROVAL_BY_AGENT[agent_name]
+
+        raise ValueError(
+            f"Agent '{agent_name}' is approved through its approval: "
+            f"use 'approve {approval_name}'. "
+            "Setting APPROVED directly would leave the approval unrecorded "
+            "and the next agent inactive, and APPROVED cannot be undone."
+        )
 
     current_status = agents[agent_name]["status"]
 

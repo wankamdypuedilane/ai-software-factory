@@ -194,6 +194,7 @@ def test_ux_ui_cannot_be_approved_when_design_gate_is_not_ready() -> None:
             state,
             "ux_ui",
             "APPROVED",
+            via_approval=True,
         )
 
 
@@ -233,6 +234,7 @@ def test_architect_approval_requires_technology_gate_when_recommended(
             "architect",
             "APPROVED",
             project_root=tmp_path,
+            via_approval=True,
         )
 
 
@@ -268,6 +270,7 @@ def test_architect_approval_succeeds_when_technology_gate_is_approved(
         "architect",
         "APPROVED",
         project_root=tmp_path,
+        via_approval=True,
     )
 
     assert result["agents"]["architect"]["status"] == "APPROVED"
@@ -300,6 +303,7 @@ def test_architect_approval_does_not_require_gate_in_manual_mode(
         "architect",
         "APPROVED",
         project_root=tmp_path,
+        via_approval=True,
     )
 
     assert result["agents"]["architect"]["status"] == "APPROVED"

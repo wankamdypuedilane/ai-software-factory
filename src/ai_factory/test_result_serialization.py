@@ -7,10 +7,13 @@ MAX_TEST_OUTPUT_CHARS = 2000
 
 
 def truncate_test_output(
-    value: str,
+    value: str | None,
     max_chars: int = MAX_TEST_OUTPUT_CHARS,
 ) -> str:
     """Truncate persisted test output to keep Factory state compact."""
+
+    if value is None:
+        return ""
 
     if len(value) <= max_chars:
         return value

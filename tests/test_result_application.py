@@ -47,8 +47,17 @@ def test_apply_agent_result_updates_agent_status_and_last_result() -> None:
     assert product["last_result"]["questions"] == [
         "What problem should the product solve?"
     ]
+    # Blockers persist structurally; a legacy string keeps the blocking
+    # behaviour it had when it was written.
     assert product["last_result"]["blockers"] == [
-        "Missing product vision."
+        {
+            "message": "Missing product vision.",
+            "kind": "EXTERNAL_DEPENDENCY",
+            "scope": "EXTERNAL",
+            "fixable_by_agent": False,
+            "requires_human_input": True,
+            "blocking": True,
+        }
     ]
     assert product["last_result"]["handoff"] is None
     assert product["last_result"]["artifacts"] == []

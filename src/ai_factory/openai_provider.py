@@ -1,3 +1,4 @@
+import functools
 import json
 import os
 from pathlib import Path
@@ -5,15 +6,68 @@ from typing import Any
 
 from dotenv import load_dotenv
 from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
     OpenAI,
     RateLimitError,
 )
+
+from ai_factory.blocker_contract import (
+    BLOCKER_KIND_VALUES,
+    BLOCKER_SCOPE_VALUES,
+    coerce_blockers,
+    normalize_blockers,
+    validate_declared_blockers,
+)
+from ai_factory.provider_errors import (
+    ProviderErrorKind,
+    ProviderExecutionError,
+    ProviderResultError,
+    kind_for_status_code,
+)
+
+
+def parses_provider_result(stage: str):
+    """Attribute every parsing refusal of `stage` to the provider result.
+
+    A response that does not satisfy the structural contract is a provider
+    result failure, not an operator mistake and not a Factory crash. Naming
+    it keeps the CLI able to report it as such, and keeps the failure
+    recoverable: parsing happens before anything is applied.
+    """
+
+    def decorator(function):
+        @functools.wraps(function)
+        def wrapper(self, raw_output):
+            try:
+                return function(self, raw_output)
+            except (ProviderResultError, ProviderExecutionError):
+                raise
+            except ValueError as error:
+                raise ProviderResultError(
+                    stage=stage,
+                    message=str(error),
+                ) from error
+
+        return wrapper
+
+    return decorator
 
 from ai_factory.agent_result import (
     AgentArtifact,
     AgentArtifactRequest,
     AgentImplementationRequest,
     AgentResult,
+)
+from ai_factory.implementation_contract import (
+    SCOPE_VALUES,
+    TASK_KIND_VALUES,
+    clamp_verification_policy,
+    coerce_scope,
+    coerce_task_kind,
+    coerce_verification_policy,
+    validate_declared_contracts,
 )
 from ai_factory.devops_result import (
     DevOpsChange,
@@ -37,6 +91,53 @@ from ai_factory.security_result import (
 )
 from ai_factory.prompt_builder import build_agent_prompt
 from ai_factory.providers import DevelopmentModelProvider
+
+
+def classify_openai_error(
+    error: Exception,
+) -> ProviderExecutionError:
+    """Classify a provider transport failure by type and status code."""
+
+    if isinstance(error, RateLimitError):
+        return ProviderExecutionError(
+            kind=ProviderErrorKind.RATE_LIMITED,
+            message=(
+                "OpenAI rate limit exceeded. "
+                "Retry later or use a model/provider with "
+                "available capacity."
+            ),
+            status_code=getattr(error, "status_code", 429),
+        )
+
+    if isinstance(
+        error,
+        (
+            APITimeoutError,
+            APIConnectionError,
+        ),
+    ):
+        return ProviderExecutionError(
+            kind=ProviderErrorKind.NETWORK,
+            message=f"OpenAI request did not complete: {error}",
+        )
+
+    if isinstance(error, APIStatusError):
+        status_code = getattr(
+            error,
+            "status_code",
+            None,
+        )
+
+        return ProviderExecutionError(
+            kind=kind_for_status_code(status_code),
+            message=f"OpenAI rejected the request: {error}",
+            status_code=status_code,
+        )
+
+    return ProviderExecutionError(
+        kind=ProviderErrorKind.UNKNOWN,
+        message=f"OpenAI call failed: {error}",
+    )
 
 
 def build_implementation_result_schema() -> dict:
@@ -77,6 +178,12 @@ def build_implementation_result_schema() -> dict:
                     "additionalProperties": False,
                 },
             },
+            "setup_commands": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
             "tests": {
                 "type": "array",
                 "items": {
@@ -94,6 +201,7 @@ def build_implementation_result_schema() -> dict:
             "task_id",
             "summary",
             "files",
+            "setup_commands",
             "tests",
             "blockers",
         ],
@@ -479,7 +587,10 @@ class OpenAIProvider(DevelopmentModelProvider):
         }
 
         max_output_tokens = self.settings.get(
-            "max_output_tokens",
+            "artifact_max_output_tokens",
+            self.settings.get(
+                "max_output_tokens",
+            ),
         )
 
         if max_output_tokens is not None:
@@ -489,11 +600,8 @@ class OpenAIProvider(DevelopmentModelProvider):
             response = self.client.responses.create(
                 **request_kwargs,
             )
-        except RateLimitError as error:
-            raise ValueError(
-                "OpenAI rate limit exceeded. "
-                "Retry later or use a model/provider with available capacity."
-            ) from error
+        except Exception as error:
+            raise classify_openai_error(error) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -534,7 +642,10 @@ class OpenAIProvider(DevelopmentModelProvider):
         }
 
         max_output_tokens = self.settings.get(
-            "max_output_tokens"
+            "implementation_max_output_tokens",
+            self.settings.get(
+                "max_output_tokens",
+            ),
         )
 
         if max_output_tokens is not None:
@@ -544,11 +655,44 @@ class OpenAIProvider(DevelopmentModelProvider):
             response = self.client.responses.create(
                 **request_kwargs,
             )
-        except RateLimitError as error:
-            raise ValueError(
-                "OpenAI rate limit exceeded. "
-                "Retry later or use a model/provider with available capacity."
-            ) from error
+        except Exception as error:
+            raise classify_openai_error(error) from error
+
+        if response.status == "incomplete":
+            incomplete_details = getattr(
+                response,
+                "incomplete_details",
+                None,
+            )
+
+            reason = getattr(
+                incomplete_details,
+                "reason",
+                incomplete_details,
+            )
+
+            retry_max_output_tokens = self.settings.get(
+                "implementation_retry_max_output_tokens"
+            )
+
+            if (
+                reason == "max_output_tokens"
+                and retry_max_output_tokens is not None
+                and retry_max_output_tokens != max_output_tokens
+            ):
+                retry_kwargs = dict(
+                    request_kwargs
+                )
+                retry_kwargs[
+                    "max_output_tokens"
+                ] = retry_max_output_tokens
+
+                try:
+                    response = self.client.responses.create(
+                        **retry_kwargs,
+                    )
+                except Exception as error:
+                    raise classify_openai_error(error) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -603,12 +747,8 @@ class OpenAIProvider(DevelopmentModelProvider):
             response = self.client.responses.create(
                 **request_kwargs,
             )
-        except RateLimitError as error:
-            raise ValueError(
-                "OpenAI rate limit exceeded. "
-                "Retry later or use a model/provider "
-                "with available capacity."
-            ) from error
+        except Exception as error:
+            raise classify_openai_error(error) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -663,12 +803,8 @@ class OpenAIProvider(DevelopmentModelProvider):
             response = self.client.responses.create(
                 **request_kwargs,
             )
-        except RateLimitError as error:
-            raise ValueError(
-                "OpenAI rate limit exceeded. "
-                "Retry later or use a model/provider "
-                "with available capacity."
-            ) from error
+        except Exception as error:
+            raise classify_openai_error(error) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -723,12 +859,8 @@ class OpenAIProvider(DevelopmentModelProvider):
             response = self.client.responses.create(
                 **request_kwargs,
             )
-        except RateLimitError as error:
-            raise ValueError(
-                "OpenAI rate limit exceeded. "
-                "Retry later or use a model/provider "
-                "with available capacity."
-            ) from error
+        except Exception as error:
+            raise classify_openai_error(error) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -783,12 +915,8 @@ class OpenAIProvider(DevelopmentModelProvider):
             response = self.client.responses.create(
                 **request_kwargs,
             )
-        except RateLimitError as error:
-            raise ValueError(
-                "OpenAI rate limit exceeded. "
-                "Retry later or use a model/provider "
-                "with available capacity."
-            ) from error
+        except Exception as error:
+            raise classify_openai_error(error) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -838,7 +966,14 @@ class OpenAIProvider(DevelopmentModelProvider):
             + "    {\n"
             + '      "id": "implementation-task-id",\n'
             + '      "title": "short implementation task title",\n'
-            + '      "purpose": "what should be implemented"\n'
+            + '      "purpose": "what should be implemented",\n'
+            + '      "kind": "IMPLEMENTATION | TEST_IMPLEMENTATION '
+            + '| VERIFICATION",\n'
+            + '      "scope": "TASK | PROJECT",\n'
+            + '      "verification": {\n'
+            + '        "allow_full_suite": false,\n'
+            + '        "baseline_required": true\n'
+            + "      }\n"
             + "    }\n"
             + "  ],\n"
             + '  "questions": [],\n'
@@ -854,6 +989,21 @@ class OpenAIProvider(DevelopmentModelProvider):
             + "- Each artifact request must include a project-relative path and "
             + "a concise purpose.\n"
             + "- Keep the overall response concise.\n"
+            + "Implementation task contract:\n"
+            + "- kind: IMPLEMENTATION produces source, TEST_IMPLEMENTATION "
+            + "produces automated tests, VERIFICATION validates work that "
+            + "already exists.\n"
+            + "- scope: TASK covers one unit, PROJECT covers the whole "
+            + "project.\n"
+            + "- verification.allow_full_suite: true only for a "
+            + "VERIFICATION unit with PROJECT scope; every other unit must "
+            + "declare false and validate itself with task-scoped "
+            + "commands.\n"
+            + "- verification.baseline_required: true for every unit that "
+            + "changes the project, so an unrelated pre-existing failure "
+            + "cannot be attributed to it.\n"
+            + "- The Factory derives execution policy from these fields "
+            + "only, never from the title or the purpose.\n"
             + "Do not wrap the JSON in Markdown code fences."
         )
 
@@ -887,6 +1037,7 @@ class OpenAIProvider(DevelopmentModelProvider):
             raw_output,
         )
 
+    @parses_provider_result("agent_result")
     def _parse_result(
         self,
         raw_output: str,
@@ -1018,13 +1169,36 @@ class OpenAIProvider(DevelopmentModelProvider):
                     "Implementation request purpose is required."
                 )
 
+            kind = coerce_task_kind(
+                request_data.get("kind")
+            )
+
+            scope = coerce_scope(
+                request_data.get("scope")
+            )
+
             implementation_requests.append(
                 AgentImplementationRequest(
                     id=request_id,
                     title=title,
                     purpose=purpose,
+                    kind=kind,
+                    scope=scope,
+                    # Reduced to what the declared kind and scope permit
+                    # before anything can read it as authority.
+                    verification=clamp_verification_policy(
+                        kind=kind,
+                        scope=scope,
+                        verification=coerce_verification_policy(
+                            request_data.get("verification")
+                        ),
+                    ),
                 )
             )
+
+        validate_declared_contracts(
+            implementation_requests
+        )
 
         status = data.get("status")
         summary = data.get("summary")
@@ -1039,14 +1213,38 @@ class OpenAIProvider(DevelopmentModelProvider):
                 "Agent result summary is required."
             )
 
+        declared_blockers = data.get("blockers", [])
+
+        validate_declared_blockers(
+            declared_blockers
+        )
+
+        blockers, harvested_questions = normalize_blockers(
+            coerce_blockers(
+                declared_blockers
+            )
+        )
+
+        questions = list(
+            data.get("questions", [])
+        )
+
+        # A blocker that only needs a human decision is surfaced through the
+        # channel that can actually be answered.
+        questions.extend(
+            question
+            for question in harvested_questions
+            if question not in questions
+        )
+
         return AgentResult(
             status=status,
             summary=summary,
             artifacts=artifacts,
             artifact_requests=artifact_requests,
             implementation_requests=implementation_requests,
-            questions=data.get("questions", []),
-            blockers=data.get("blockers", []),
+            questions=questions,
+            blockers=blockers,
             handoff=data.get("handoff"),
             metadata=data.get("metadata", {}),
         )
@@ -1134,11 +1332,53 @@ class OpenAIProvider(DevelopmentModelProvider):
                                     "purpose": {
                                         "type": "string",
                                     },
+                                    "kind": {
+                                        "type": [
+                                            "string",
+                                            "null",
+                                        ],
+                                        "enum": [
+                                            *TASK_KIND_VALUES,
+                                            None,
+                                        ],
+                                    },
+                                    "scope": {
+                                        "type": [
+                                            "string",
+                                            "null",
+                                        ],
+                                        "enum": [
+                                            *SCOPE_VALUES,
+                                            None,
+                                        ],
+                                    },
+                                    "verification": {
+                                        "type": [
+                                            "object",
+                                            "null",
+                                        ],
+                                        "properties": {
+                                            "allow_full_suite": {
+                                                "type": "boolean",
+                                            },
+                                            "baseline_required": {
+                                                "type": "boolean",
+                                            },
+                                        },
+                                        "required": [
+                                            "allow_full_suite",
+                                            "baseline_required",
+                                        ],
+                                        "additionalProperties": False,
+                                    },
                                 },
                                 "required": [
                                     "id",
                                     "title",
                                     "purpose",
+                                    "kind",
+                                    "scope",
+                                    "verification",
                                 ],
                                 "additionalProperties": False,
                             },
@@ -1152,7 +1392,42 @@ class OpenAIProvider(DevelopmentModelProvider):
                         "blockers": {
                             "type": "array",
                             "items": {
-                                "type": "string",
+                                "type": "object",
+                                "properties": {
+                                    "message": {
+                                        "type": "string",
+                                    },
+                                    "kind": {
+                                        "type": "string",
+                                        "enum": list(
+                                            BLOCKER_KIND_VALUES
+                                        ),
+                                    },
+                                    "scope": {
+                                        "type": "string",
+                                        "enum": list(
+                                            BLOCKER_SCOPE_VALUES
+                                        ),
+                                    },
+                                    "fixable_by_agent": {
+                                        "type": "boolean",
+                                    },
+                                    "requires_human_input": {
+                                        "type": "boolean",
+                                    },
+                                    "blocking": {
+                                        "type": "boolean",
+                                    },
+                                },
+                                "required": [
+                                    "message",
+                                    "kind",
+                                    "scope",
+                                    "fixable_by_agent",
+                                    "requires_human_input",
+                                    "blocking",
+                                ],
+                                "additionalProperties": False,
                             },
                         },
                         "handoff": {
@@ -1223,7 +1498,10 @@ class OpenAIProvider(DevelopmentModelProvider):
         }
 
         max_output_tokens = self.settings.get(
-            "max_output_tokens",
+            "agent_max_output_tokens",
+            self.settings.get(
+                "max_output_tokens",
+            ),
         )
 
         if max_output_tokens is not None:
@@ -1233,11 +1511,8 @@ class OpenAIProvider(DevelopmentModelProvider):
             response = self.client.responses.create(
                 **request_kwargs,
             )
-        except RateLimitError as error:
-            raise ValueError(
-                "OpenAI rate limit exceeded. "
-                "Retry later or use a model/provider with available capacity."
-            ) from error
+        except Exception as error:
+            raise classify_openai_error(error) from error
 
         if response.status == "incomplete":
             incomplete_details = getattr(
@@ -1258,6 +1533,7 @@ class OpenAIProvider(DevelopmentModelProvider):
 
         return response.output_text
 
+    @parses_provider_result("implementation_result")
     def _parse_implementation_result(
         self,
         raw_output: str,
@@ -1279,6 +1555,10 @@ class OpenAIProvider(DevelopmentModelProvider):
         task_id = data.get("task_id")
         summary = data.get("summary")
         files_data = data.get("files", [])
+        setup_commands = data.get(
+            "setup_commands",
+            [],
+        )
         tests = data.get("tests", [])
         blockers = data.get("blockers", [])
 
@@ -1295,6 +1575,14 @@ class OpenAIProvider(DevelopmentModelProvider):
         if not isinstance(files_data, list):
             raise ValueError(
                 "Implementation result files must be a list."
+            )
+
+        if not isinstance(setup_commands, list) or not all(
+            isinstance(command, str)
+            for command in setup_commands
+        ):
+            raise ValueError(
+                "Implementation result setup_commands must be a list of strings."
             )
 
         if not isinstance(tests, list) or not all(
@@ -1352,10 +1640,12 @@ class OpenAIProvider(DevelopmentModelProvider):
             task_id=task_id,
             summary=summary,
             files=files,
+            setup_commands=setup_commands,
             tests=tests,
             blockers=blockers,
         )
 
+    @parses_provider_result("qa_result")
     def _parse_qa_result(
         self,
         raw_output: str,
@@ -1479,6 +1769,7 @@ class OpenAIProvider(DevelopmentModelProvider):
             blockers=blockers,
         )
 
+    @parses_provider_result("security_result")
     def _parse_security_result(
         self,
         raw_output: str,
@@ -1614,6 +1905,7 @@ class OpenAIProvider(DevelopmentModelProvider):
             blockers=blockers,
         )
 
+    @parses_provider_result("devops_result")
     def _parse_devops_result(
         self,
         raw_output: str,
@@ -1743,6 +2035,7 @@ class OpenAIProvider(DevelopmentModelProvider):
             rollback_strategy=rollback_strategy,
         )
 
+    @parses_provider_result("sre_result")
     def _parse_sre_result(
         self,
         raw_output: str,
@@ -1892,4 +2185,3 @@ class OpenAIProvider(DevelopmentModelProvider):
             observability_ready=observability_ready,
             incident_readiness=incident_readiness,
         )
-
