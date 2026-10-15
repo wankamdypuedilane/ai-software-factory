@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import PurePosixPath, PureWindowsPath
 
 from ai_factory.implementation_result import (
     ImplementationFileChange,
@@ -23,9 +23,14 @@ def validate_implementation_path(
 
     normalized = path.replace("\\", "/")
 
-    candidate = Path(normalized)
+    candidate = PurePosixPath(normalized)
 
-    if candidate.is_absolute():
+    # Check both path flavours so that Windows drive paths such as
+    # "C:/Users/..." or "C:file" are rejected on every operating system.
+    if (
+        candidate.is_absolute()
+        or PureWindowsPath(normalized).drive
+    ):
         raise ValueError(
             f"Absolute implementation path is not allowed: {path}"
         )

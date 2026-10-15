@@ -1,13 +1,12 @@
 from pathlib import Path
 
+from ai_factory.resources import get_agents_dir
+
 
 def get_agents_root() -> Path:
     """Return the root directory containing agent contracts."""
 
-    return (
-        Path(__file__).resolve().parents[2]
-        / "agents"
-    )
+    return get_agents_dir()
 
 
 def get_agent_contract_path(agent_name: str) -> Path:

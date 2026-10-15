@@ -28,7 +28,10 @@ from ai_factory.blocker_recovery import (
     GATE_BY_APPROVAL,
     resolve_gate_blockers,
 )
-from ai_factory.project import initialize_project
+from ai_factory.project import (
+    get_product_input_path,
+    initialize_project,
+)
 from ai_factory.provider_errors import (
     ProviderExecutionError,
     ProviderResultError,
@@ -382,6 +385,17 @@ def main() -> None:
 
             print(f"Project created: {project_root}")
             print(f"Factory state: {project_root / '.factory' / 'state.yaml'}")
+            project_config = load_state(
+                project_root / ".factory" / "project.yaml"
+            )
+            print(
+                "Product input: "
+                f"{get_product_input_path(project_root, project_config)}"
+            )
+            print(
+                "Next: describe your product in that file, "
+                "then run 'ai-factory run-workflow' from the project directory."
+            )
 
         except FileExistsError as error:
             parser.error(str(error))
