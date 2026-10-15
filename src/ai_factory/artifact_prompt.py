@@ -12,6 +12,7 @@ def build_artifact_prompt(
     project = context.get("project", {})
     state = context.get("state", {})
     human_input = context.get("human_input")
+    upstream_artifacts = context.get("artifacts") or {}
 
     sections = [
         "# Artifact Generation",
@@ -38,6 +39,25 @@ def build_artifact_prompt(
             ]
         )
 
+    # Without the upstream artifacts the generator only sees the purpose,
+    # and reports as unspecified what earlier phases already decided.
+    if upstream_artifacts:
+        sections.extend(
+            [
+                "",
+                "## Upstream Artifacts",
+            ]
+        )
+
+        for path, content in upstream_artifacts.items():
+            sections.extend(
+                [
+                    "",
+                    f"### {path}",
+                    content.strip(),
+                ]
+            )
+
     sections.extend(
         [
             "",
@@ -50,5 +70,11 @@ def build_artifact_prompt(
             "Do not invent missing product requirements.",
         ]
     )
+
+    if upstream_artifacts:
+        sections.append(
+            "Treat the upstream artifacts as approved decisions; "
+            "do not mark as unspecified anything they define."
+        )
 
     return "\n".join(sections)
