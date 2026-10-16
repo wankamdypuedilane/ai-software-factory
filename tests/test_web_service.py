@@ -238,3 +238,31 @@ def test_review_carries_the_owner_summary(tmp_path: Path) -> None:
 
     assert view["pending"]["kind"] == "review"
     assert view["pending"]["owner_summary"]["will_do"]
+
+
+def test_attention_names_the_unit_that_actually_blocked(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Blocked", "Une idée suffisamment longue.", "novice")
+
+    for step in ("product", "ux_ui", "architect"):
+        service.approve_step("blocked", step)
+
+    state_path = tmp_path / "projects" / "blocked" / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["status"] = "BLOCKED"
+    developer["last_result"]["blockers"] = [
+        {"message": "Planning note", "blocking": False},
+    ]
+    developer["last_result"]["implementation_blockers"] = [
+        {
+            "task_id": "RS-MVP-006",
+            "blockers": [{"message": "Routes missing", "blocking": True}],
+        }
+    ]
+    save_state(state_path, state)
+
+    pending = service.project_view("blocked")["pending"]
+
+    assert pending["kind"] == "attention"
+    assert pending["reasons"] == ["RS-MVP-006 : Routes missing"]

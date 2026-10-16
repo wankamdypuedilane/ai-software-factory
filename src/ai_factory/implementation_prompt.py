@@ -113,6 +113,7 @@ def build_implementation_prompt(
     failed_attempt_generated_paths: list[str] | None = None,
     failed_attempt_paths: list[str] | None = None,
     policy_corrections: list[str] | None = None,
+    later_tasks: list[ImplementationTask] | None = None,
 ) -> str:
     """Build a focused prompt for one implementation task."""
 
@@ -131,6 +132,20 @@ def build_implementation_prompt(
         "## Purpose",
         task.purpose,
     ]
+
+    if later_tasks:
+        sections.extend(
+            [
+                "",
+                "## Later Tasks Of This Plan",
+                "These units run after this one, in this order. Work they "
+                "will do is never a blocker for this task: do your part, "
+                "leave theirs to them, and mention the handover in your "
+                "summary.",
+                "",
+                *(f"- {later.id}: {later.title}" for later in later_tasks),
+            ]
+        )
 
     rework = context.get("rework_request")
 
