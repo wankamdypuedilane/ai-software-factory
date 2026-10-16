@@ -43,7 +43,7 @@ module.exports.legacy = 1;
 def test_python_lists_public_definitions_only() -> None:
     content = "def run():\n    pass\n\ndef _private():\n    pass\n\nclass Store:\n    pass\nLIMIT = 3\n"
 
-    assert module_exports("app/core.py", content) == ["run", "Store", "LIMIT"]
+    assert module_exports("app/core.py", content) == ["run()", "Store", "LIMIT"]
 
 
 def test_non_code_files_are_skipped() -> None:
@@ -60,8 +60,9 @@ def test_index_names_which_helper_exports_what() -> None:
     )
 
     assert lines == [
-        "- tests/helpers/isolated-postgres.mjs: prepareTestDatabase",
-        "- tests/helpers/test-database.mjs: testDatabaseConfiguration, openTestDatabase",
+        "- tests/helpers/isolated-postgres.mjs: prepareTestDatabase(env = process.env)",
+        "- tests/helpers/test-database.mjs: testDatabaseConfiguration(env = process.env), "
+        "openTestDatabase(env = process.env)",
     ]
 
 
@@ -80,5 +81,24 @@ def test_prompt_keeps_the_index_when_file_contents_are_cut() -> None:
     prompt = build_implementation_prompt(task, {}, workspace_files=workspace)
 
     assert "### Export Index" in prompt
-    assert "- tests/helpers/isolated-postgres.mjs: prepareTestDatabase" in prompt
+    assert "- tests/helpers/isolated-postgres.mjs: prepareTestDatabase(env = process.env)" in prompt
     assert "further workspace files omitted" in prompt
+
+
+def test_signatures_show_how_to_call_a_function() -> None:
+    content = """
+export function createBookingService(
+  serviceRepository: ServiceRepository,
+  bookingRepository: BookingRepository,
+  options: {
+    salonEmail: string;
+  }
+): BookingService {}
+export const on = async (cb: (x: number) => void, opts: Map<string, number>) => cb;
+"""
+
+    assert module_exports("src/BookingService.ts", content) == [
+        "createBookingService(serviceRepository: ServiceRepository, "
+        "bookingRepository: BookingRepository, options: { salonEmail: string; })",
+        "on(cb: (x: number) => void, opts: Map<string, number>)",
+    ]

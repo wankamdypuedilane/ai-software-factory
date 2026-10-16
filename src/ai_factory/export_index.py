@@ -17,7 +17,8 @@ SCRIPT_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts")
 PYTHON_SUFFIXES = (".py",)
 
 MAX_NAMES_PER_MODULE = 40
-MAX_INDEX_CHARS = 12000
+MAX_INDEX_CHARS = 20000
+MAX_SIGNATURE_CHARS = 200
 
 _JS_DECLARATION = re.compile(
     r"^\s*export\s+(?:declare\s+)?(?:abstract\s+)?"
@@ -39,10 +40,73 @@ _PY = re.compile(r"^(?:async\s+def|def|class)\s+([A-Za-z_]\w*)", re.MULTILINE)
 _PY_ASSIGN = re.compile(r"^([A-Z_][A-Z0-9_]*)\s*(?::[^=\n]+)?=", re.MULTILINE)
 
 
+_JS_FUNCTION = re.compile(
+    r"^\s*export\s+(?:default\s+)?(?:declare\s+)?(?:async\s+)?function\*?\s+"
+    r"([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\(",
+    re.MULTILINE,
+)
+_JS_ARROW = re.compile(
+    r"^\s*export\s+const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s+)?\(",
+    re.MULTILINE,
+)
+_PY_DEF = re.compile(r"^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(", re.MULTILINE)
+
+
+def _parameters(content: str, open_index: int) -> str | None:
+    """Return the balanced parameter list starting at `(`, collapsed.
+
+    A real unit called createBookingService with five positional
+    arguments while it takes four, the last an options object: names
+    alone did not say how to call a function.
+    """
+
+    depth = 0
+
+    for index in range(open_index, min(len(content), open_index + 2000)):
+        char = content[index]
+
+        if char in "([{<":
+            depth += 1
+        elif char in ")]}>" and not (char == ">" and content[index - 1] == "="):
+            depth -= 1
+
+            if depth == 0:
+                text = re.sub(r"\s+", " ", content[open_index:index + 1])
+                text = text.replace("( ", "(").replace(" )", ")")
+
+                if len(text) > MAX_SIGNATURE_CHARS:
+                    text = text[: MAX_SIGNATURE_CHARS - 2] + "…)"
+
+                return text
+
+    return None
+
+
+def _signatures(content: str, pattern: re.Pattern[str]) -> dict[str, str]:
+    signatures: dict[str, str] = {}
+
+    for match in pattern.finditer(content):
+        params = _parameters(content, match.end() - 1)
+
+        if params is not None:
+            signatures.setdefault(match.group(1), params)
+
+    return signatures
+
+
+def _with_signatures(names: list[str], signatures: dict[str, str]) -> list[str]:
+    return [f"{name}{signatures[name]}" if name in signatures else name for name in names]
+
+
 def _js_exports(content: str) -> list[str]:
     names: list[str] = []
 
-    names.extend(_JS_DECLARATION.findall(content))
+    names.extend(
+        _with_signatures(
+            _JS_DECLARATION.findall(content),
+            {**_signatures(content, _JS_ARROW), **_signatures(content, _JS_FUNCTION)},
+        )
+    )
 
     for body, source in _JS_LIST.findall(content):
         for item in body.split(","):
@@ -77,7 +141,8 @@ def _js_exports(content: str) -> list[str]:
 
 
 def _python_exports(content: str) -> list[str]:
-    names = _PY.findall(content) + _PY_ASSIGN.findall(content)
+    names = _with_signatures(_PY.findall(content), _signatures(content, _PY_DEF))
+    names += _PY_ASSIGN.findall(content)
     return [name for name in names if not name.startswith("_")]
 
 
