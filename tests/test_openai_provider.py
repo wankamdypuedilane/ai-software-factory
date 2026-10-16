@@ -213,6 +213,7 @@ def test_openai_provider_execute_uses_responses_api(
         "artifact_requests",
         "implementation_requests",
         "questions",
+        "question_details",
         "blockers",
         "handoff",
         "metadata",
@@ -2740,3 +2741,75 @@ def test_implementation_budget_retries_truncation_with_double_budget(
 
     assert provider._implementation_max_output_tokens() == 32000
     assert provider._implementation_retry_max_output_tokens() == 64000
+
+
+def test_question_details_keep_exactly_one_recommendation() -> None:
+    from ai_factory.openai_provider import normalize_question_details
+
+    details = normalize_question_details(
+        [
+            {
+                "question": "Qui peut réserver ?",
+                "why": "Comptes ou pas.",
+                "options": [
+                    {"label": "Sans compte", "detail": "Simple.", "recommended": True},
+                    {"label": "Avec compte", "detail": "Historique.", "recommended": True},
+                ],
+            },
+            {
+                "question": "Notification ?",
+                "options": [
+                    {"label": "E-mail", "detail": "Gratuit."},
+                    {"label": "", "detail": "dropped"},
+                ],
+            },
+            {"question": "   ", "options": []},
+            "not a dict",
+        ]
+    )
+
+    assert [d["question"] for d in details] == [
+        "Qui peut réserver ?",
+        "Notification ?",
+    ]
+    assert [o["recommended"] for o in details[0]["options"]] == [True, False]
+    assert details[1]["options"] == [
+        {"label": "E-mail", "detail": "Gratuit.", "recommended": True},
+    ]
+    assert details[1]["why"] == ""
+
+
+def test_parse_result_merges_detailed_questions_into_questions(monkeypatch) -> None:
+    import json
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    provider = OpenAIProvider(model="test-model")
+
+    result = provider._parse_result(
+        json.dumps(
+            {
+                "status": "NEEDS_INPUT",
+                "summary": "Questions.",
+                "artifacts": [],
+                "artifact_requests": [],
+                "implementation_requests": [],
+                "questions": [],
+                "question_details": [
+                    {
+                        "question": "Quelle technique ?",
+                        "why": "Langage et outils.",
+                        "options": [
+                            {"label": "Laisse le moteur choisir", "detail": "Recommandé.", "recommended": True},
+                            {"label": "Je choisis", "detail": "Next.js…", "recommended": False},
+                        ],
+                    }
+                ],
+                "blockers": [],
+                "handoff": None,
+                "metadata": {"technology_proposal": None},
+            }
+        )
+    )
+
+    assert result.questions == ["Quelle technique ?"]
+    assert result.question_details[0]["options"][0]["recommended"] is True

@@ -1,3 +1,5 @@
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -5,10 +7,34 @@ from ai_factory.resources import get_templates_dir
 from ai_factory.state import load_state, save_state
 
 
+def project_slug(project_name: str) -> str:
+    """Return a folder-safe project id: ASCII letters, digits and dashes.
+
+    Accents are folded ("Réservations" -> "reservations") so the id stays
+    usable in a URL and on every file system.
+    """
+
+    folded = (
+        unicodedata.normalize("NFKD", project_name)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .lower()
+    )
+
+    slug = re.sub(r"[^a-z0-9]+", "-", folded).strip("-")
+
+    if not slug:
+        raise ValueError(
+            "Project name must contain letters or digits."
+        )
+
+    return slug
+
+
 def initialize_project(project_name: str, target_dir: Path) -> Path:
     """Initialize a new project using the Factory templates."""
 
-    project_id = project_name.lower().replace(" ", "-")
+    project_id = project_slug(project_name)
     project_root = target_dir / project_id
     factory_dir = project_root / ".factory"
 

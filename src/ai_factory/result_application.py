@@ -37,6 +37,7 @@ def apply_agent_result(
         "status": result.status,
         "summary": result.summary,
         "questions": list(result.questions),
+        "question_details": list(result.question_details),
         "blockers": serialize_blockers(result.blockers),
         "handoff": result.handoff,
         "artifacts": [

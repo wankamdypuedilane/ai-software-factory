@@ -22,7 +22,14 @@ def create_provider(
     provider_name = ai_config.get("provider")
 
     if provider_name == "mock":
-        return MockProvider()
+        settings = ai_config.get("settings") or {}
+
+        return MockProvider(
+            ask_questions=bool(
+                isinstance(settings, dict)
+                and settings.get("mock_ask_questions")
+            ),
+        )
 
     if provider_name == "openai":
         model = ai_config.get("model")

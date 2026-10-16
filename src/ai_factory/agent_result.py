@@ -48,6 +48,10 @@ class AgentResult:
         default_factory=list
     )
     questions: list[str] = field(default_factory=list)
+    # The same questions with answer options, so an interface can offer a
+    # recommended choice instead of a blank text box. Each entry:
+    # {"question", "why", "options": [{"label", "detail", "recommended"}]}.
+    question_details: list[dict[str, Any]] = field(default_factory=list)
     blockers: list[Blocker] = field(default_factory=list)
     handoff: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
