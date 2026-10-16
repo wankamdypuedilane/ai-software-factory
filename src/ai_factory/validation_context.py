@@ -30,6 +30,8 @@ VALIDATION_EXECUTION_RULES = (
     "a local command-line tool, for example) are not defects or blockers.",
     "Set passed=false only for a concrete defect or risk you can point to in "
     "the supplied evidence.",
+    "Findings of Low or Informational severity are reported but never set "
+    "passed=false on their own.",
 )
 
 

@@ -19,6 +19,8 @@ QA behaviour changes.
 
 from typing import Any
 
+from ai_factory.rework import recovery_guidance
+
 from ai_factory.replan_guard import (
     next_repeated_failures,
     next_replan_count,
@@ -224,6 +226,7 @@ def assert_security_retry_budget(
             "produced the same failure. The workflow stopped instead of "
             "spending another provider call. Inspect the persisted "
             "security evidence, findings and blockers of the last attempt."
+            + recovery_guidance("security")
         )
 
     count = get_security_retry_count(state)
@@ -236,4 +239,5 @@ def assert_security_retry_budget(
             "of spending another provider call. Security does not modify "
             "the workspace, so a further attempt would review the same "
             "artifacts again."
+            + recovery_guidance("security")
         )

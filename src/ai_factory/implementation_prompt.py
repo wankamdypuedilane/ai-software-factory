@@ -16,6 +16,10 @@ MAX_RELEVANT_ARTIFACT_CHARS = 4000
 BINDING_CONTRACT_ARTIFACTS = (
     "knowledge/architecture/interfaces.md",
     "knowledge/architecture/api.md",
+    # The interaction contract (commands, outputs, messages, exit codes) the
+    # UX/UI contract asks to be written here. A real run truncated the UX
+    # specification to 2843 of its 4866 characters on the Developer side.
+    "design/ux-ui/screen-specs.md",
 )
 MAX_BINDING_CONTRACT_CHARS = 16000
 MAX_RELEVANT_ARTIFACTS_TOTAL_CHARS = 32000

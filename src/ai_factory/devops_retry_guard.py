@@ -18,6 +18,8 @@ or Security behaviour changes.
 
 from typing import Any
 
+from ai_factory.rework import recovery_guidance
+
 from ai_factory.devops_evidence import (
     describe_devops_evidence,
     devops_evidence_satisfied,
@@ -219,6 +221,7 @@ def assert_devops_retry_budget(
             "the same failure. The workflow stopped instead of spending "
             "another provider call. Inspect the persisted DevOps evidence, "
             "deployment readiness and rollback strategy of the last attempt."
+            + recovery_guidance("devops")
         )
 
     count = get_devops_retry_count(state)
@@ -230,4 +233,5 @@ def assert_devops_retry_budget(
             "The workflow stopped instead of spending another provider "
             "call. DevOps does not apply its changes to the workspace, so "
             "a further attempt would inspect the same state again."
+            + recovery_guidance("devops")
         )
