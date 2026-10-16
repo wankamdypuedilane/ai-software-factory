@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 
+from ai_factory.project_environment import active_project_environment
 from ai_factory.test_command_policy import (
     validate_test_command,
 )
@@ -65,6 +66,7 @@ def run_test_command(
     )
 
     env = os.environ.copy()
+    env.update(active_project_environment())
 
     if not env.get("DATABASE_URL"):
         env["DATABASE_URL"] = build_default_database_url(
