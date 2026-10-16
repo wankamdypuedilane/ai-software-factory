@@ -1,5 +1,6 @@
 import functools
 import json
+import time
 import os
 from pathlib import Path
 from typing import Any
@@ -97,6 +98,18 @@ def classify_openai_error(
     error: Exception,
 ) -> ProviderExecutionError:
     """Classify a provider transport failure by type and status code."""
+
+    # An exhausted balance is reported as a 429 too, but waiting never
+    # fixes it. The error code is a structured field of the response body.
+    if getattr(error, "code", None) == "insufficient_quota":
+        return ProviderExecutionError(
+            kind=ProviderErrorKind.PERMANENT_REQUEST,
+            message=(
+                "OpenAI reports insufficient quota: the account has no "
+                "credit left. Add credit in the OpenAI billing settings."
+            ),
+            status_code=getattr(error, "status_code", 429),
+        )
 
     if isinstance(error, RateLimitError):
         return ProviderExecutionError(
@@ -952,6 +965,32 @@ def normalize_question_details(
     return details
 
 
+# Waits before each retry of a transient provider failure. Per-minute rate
+# limits need tens of seconds, not the SDK's sub-second backoff.
+DEFAULT_RETRY_DELAYS_SECONDS = (20.0, 40.0, 60.0)
+MAX_RETRY_AFTER_SECONDS = 120.0
+
+
+def _retry_after_seconds(error: Exception) -> float | None:
+    """Return the provider's Retry-After hint, when it sent one."""
+
+    response = getattr(error, "response", None)
+    headers = getattr(response, "headers", None)
+
+    if headers is None:
+        return None
+
+    try:
+        value = float(headers.get("retry-after"))
+    except (TypeError, ValueError):
+        return None
+
+    if value < 0:
+        return None
+
+    return min(value, MAX_RETRY_AFTER_SECONDS)
+
+
 class OpenAIProvider(DevelopmentModelProvider):
     """OpenAI-backed model provider."""
 
@@ -1663,14 +1702,47 @@ class OpenAIProvider(DevelopmentModelProvider):
         self,
         request_kwargs: dict[str, Any],
     ) -> Any:
-        """Send one request, classifying any transport failure."""
+        """Send one request, waiting and retrying on transient failures.
 
-        try:
-            return self.client.responses.create(
-                **request_kwargs,
-            )
-        except Exception as error:
-            raise classify_openai_error(error) from error
+        Rate limits are per minute, so the SDK's own sub-second retries do
+        not outlast them: a real run stopped on RATE_LIMITED in the middle
+        of the Developer phase. Retryable failures (rate limit, server
+        error, network) wait and try again a bounded number of times;
+        everything else is raised at once.
+        """
+
+        delays = self._retry_delays()
+
+        for attempt in range(len(delays) + 1):
+            try:
+                return self.client.responses.create(
+                    **request_kwargs,
+                )
+            except Exception as error:
+                classified = classify_openai_error(error)
+
+                if not classified.retryable or attempt >= len(delays):
+                    raise classified from error
+
+                self._sleep(
+                    _retry_after_seconds(error) or delays[attempt]
+                )
+
+        raise AssertionError("unreachable")
+
+    def _retry_delays(self) -> list[float]:
+        configured = self.settings.get("provider_retry_delays_seconds")
+
+        if isinstance(configured, list) and all(
+            isinstance(value, (int, float)) and value >= 0
+            for value in configured
+        ):
+            return [float(value) for value in configured]
+
+        return list(DEFAULT_RETRY_DELAYS_SECONDS)
+
+    def _sleep(self, seconds: float) -> None:
+        time.sleep(seconds)
 
     @parses_provider_result("implementation_result")
     def _parse_implementation_result(

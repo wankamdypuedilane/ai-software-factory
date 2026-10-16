@@ -2879,3 +2879,81 @@ def test_owner_summary_keeps_sentences_within_limits() -> None:
     assert "wont_do" not in summary
     assert summary["assumptions"] == ["Prix d'exemple : coupe 35 €"]
     assert normalize_owner_summary("nope") == {}
+
+
+def _retry_provider(monkeypatch, outcomes):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "ai_factory.openai_provider.RateLimitError",
+        _FakeRateLimitError,
+    )
+    provider = OpenAIProvider(model="test-model")
+    waits = []
+    provider._sleep = waits.append
+    calls = {"count": 0}
+
+    def create(**kwargs):
+        outcome = outcomes[calls["count"]]
+        calls["count"] += 1
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    provider.client = type("C", (), {})()
+    provider.client.responses = type("R", (), {"create": staticmethod(create)})()
+    return provider, waits, calls
+
+
+class _FakeRateLimitError(Exception):
+    def __init__(self, code=None, retry_after=None):
+        super().__init__("rate limited")
+        self.code = code
+        self.status_code = 429
+        headers = {"retry-after": str(retry_after)} if retry_after is not None else {}
+        self.response = type("Resp", (), {"headers": headers})()
+
+
+def _rate_limit_error(code=None, retry_after=None):
+    return _FakeRateLimitError(code=code, retry_after=retry_after)
+
+
+def test_rate_limit_is_retried_after_waiting(monkeypatch) -> None:
+    ok = object()
+    provider, waits, calls = _retry_provider(
+        monkeypatch,
+        [_rate_limit_error(), _rate_limit_error(retry_after=7), ok],
+    )
+
+    assert provider._create_response({"model": "m", "input": "x"}) is ok
+    assert calls["count"] == 3
+    assert waits == [20.0, 7.0]
+
+
+def test_rate_limit_still_fails_after_the_last_retry(monkeypatch) -> None:
+    from ai_factory.provider_errors import ProviderExecutionError
+
+    provider, waits, calls = _retry_provider(
+        monkeypatch,
+        [_rate_limit_error() for _ in range(4)],
+    )
+
+    with pytest.raises(ProviderExecutionError, match="RATE_LIMITED"):
+        provider._create_response({"model": "m", "input": "x"})
+
+    assert calls["count"] == 4
+    assert waits == [20.0, 40.0, 60.0]
+
+
+def test_insufficient_quota_is_not_retried(monkeypatch) -> None:
+    from ai_factory.provider_errors import ProviderExecutionError
+
+    provider, waits, calls = _retry_provider(
+        monkeypatch,
+        [_rate_limit_error(code="insufficient_quota")],
+    )
+
+    with pytest.raises(ProviderExecutionError, match="insufficient quota"):
+        provider._create_response({"model": "m", "input": "x"})
+
+    assert calls["count"] == 1
+    assert waits == []
