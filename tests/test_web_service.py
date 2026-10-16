@@ -291,3 +291,29 @@ def test_an_instruction_reaches_a_stopped_developer(tmp_path: Path, status: str)
     assert view["pending"]["kind"] == "review"
     resets = load_state(state_path)["agents"]["developer"]["replan_budget_resets"]
     assert resets[-1]["source"] == "web:request-changes"
+
+
+def test_a_step_stopped_by_the_guard_offers_a_retry(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Guarded", "Une idée suffisamment longue.", "novice")
+
+    for step in ("product", "ux_ui", "architect"):
+        service.approve_step("guarded", step)
+
+    state_path = tmp_path / "projects" / "guarded" / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["status"] = "READY"
+    developer["last_result"]["replan_count"] = 2
+    developer["last_result"]["repeated_failures"] = 1
+    developer["last_result"]["failure_signature"] = "blocked"
+    save_state(state_path, state)
+    service._job("guarded").error = "NON_CONVERGING_IMPLEMENTATION: stopped."
+
+    pending = service.project_view("guarded")["pending"]
+    assert pending["kind"] == "attention"
+    assert pending["agent"] == "developer"
+
+    view = service.retry_step("guarded", "developer")
+
+    assert view["pending"]["kind"] == "review"

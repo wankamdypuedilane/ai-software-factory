@@ -769,6 +769,22 @@ class FactoryService:
                     and agents.get("developer", {}).get("status") == "APPROVED",
                 }
 
+            # Stopped by the non-convergence guard: "Relancer" would hit the
+            # same guard again, so offer the retry that reopens the budget.
+            if (
+                status == "READY"
+                and name in BUDGETED_AGENTS
+                and job.error
+                and is_budget_exhausted(state, name)
+            ):
+                return {
+                    **base,
+                    "kind": "attention",
+                    "reasons": _blocking_reasons(last_result) or [job.error],
+                    "items": [],
+                    "can_send_back": False,
+                }
+
             if status in {"READY", "NOT_STARTED", "IN_PROGRESS"}:
                 return {**base, "kind": "ready"}
 
