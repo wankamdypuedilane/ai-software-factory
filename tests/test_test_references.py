@@ -74,3 +74,27 @@ def test_correction_names_each_missing_file() -> None:
 
     assert any("src/app/layout.tsx" in line for line in lines)
     assert any("RS-MVP-009" in line for line in lines)
+
+
+def test_tests_only_response_is_detected() -> None:
+    from ai_factory.test_references import writes_only_tests
+
+    assert writes_only_tests(["tests/a.test.mjs", "tests/helpers/db.mjs"])
+    assert not writes_only_tests(["tests/a.test.mjs", "src/server/route.ts"])
+    assert not writes_only_tests([])
+
+
+def test_helpers_are_shown_before_other_workspace_files() -> None:
+    from ai_factory.implementation_prompt import build_implementation_prompt
+    from ai_factory.implementation_request import ImplementationTask
+
+    workspace = {f"src/big{index}.ts": "x" * 6000 for index in range(10)}
+    workspace["tests/helpers/isolated-postgres.mjs"] = "export async function prepareTestDatabase() { return { env, dispose } }"
+
+    prompt = build_implementation_prompt(
+        ImplementationTask(agent_name="developer", id="T", title="t", purpose="p"),
+        {},
+        workspace_files=workspace,
+    )
+
+    assert "### tests/helpers/isolated-postgres.mjs\nexport async function prepareTestDatabase" in prompt

@@ -132,3 +132,28 @@ def build_missing_reference_correction(
         ]
     )
     return corrections
+
+
+def writes_only_tests(paths: list[str]) -> bool:
+    """Whether a response writes test files and nothing else.
+
+    Two real units of an implementation task returned only their tests;
+    the code under test was never written and every test failed.
+    """
+
+    return bool(paths) and all(
+        _is_test_file(path)
+        or path.replace("\\", "/").startswith(("tests/", "test/"))
+        for path in paths
+    )
+
+
+def build_tests_only_correction(task_id: str) -> list[str]:
+    return [
+        "The previous response was rejected by the Factory runtime and was not applied.",
+        f"Return a corrected response for task {task_id}.",
+        "This is an implementation task, but the response only wrote test files.",
+        "Write the production code this task implements, with its complete "
+        "content, together with its tests in this same response.",
+        "Do not report this correction as a blocker.",
+    ]
