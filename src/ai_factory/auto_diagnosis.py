@@ -38,6 +38,11 @@ from ai_factory.test_references import _LITERAL, _PATH_SHAPE, _candidates
 
 
 MAX_AUTO_DIAGNOSES_PER_TASK = 2
+# A Developer may rename a task when it replans (RS-MVP-010 became
+# RS-MVP-010A in a real run), so a per-task bound alone could be renewed
+# indefinitely. This one counts every automatic diagnosis since the last
+# action of a human, whatever the task.
+MAX_AUTO_DIAGNOSES_WITHOUT_HUMAN = 4
 HISTORY_FIELD = "auto_diagnoses"
 AUTO_HEADING = "Requested changes"
 AUTO_MARKER = "(Diagnostic automatique de la Factory)"
@@ -344,6 +349,21 @@ def _attempts_for(developer: dict[str, Any], task_id: str) -> int:
     )
 
 
+def _attempts_since_human(developer: dict[str, Any]) -> int:
+    human_resets = [
+        str(entry.get("at", ""))
+        for entry in developer.get("replan_budget_resets", []) or []
+        if isinstance(entry, dict) and not str(entry.get("source", "")).startswith("auto:")
+    ]
+    since = max(human_resets, default="")
+
+    return sum(
+        1
+        for entry in developer.get(HISTORY_FIELD, []) or []
+        if isinstance(entry, dict) and str(entry.get("at", "")) > since
+    )
+
+
 def has_diagnosis_left(state: dict[str, Any]) -> bool:
     """Whether a stopped Developer may still be diagnosed automatically."""
 
@@ -356,6 +376,7 @@ def has_diagnosis_left(state: dict[str, Any]) -> bool:
         and is_budget_exhausted(state, "developer")
         and bool(task_id)
         and _attempts_for(developer, task_id) < MAX_AUTO_DIAGNOSES_PER_TASK
+        and _attempts_since_human(developer) < MAX_AUTO_DIAGNOSES_WITHOUT_HUMAN
     )
 
 

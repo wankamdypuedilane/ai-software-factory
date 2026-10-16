@@ -216,3 +216,29 @@ def test_stack_traces_lead_to_the_typescript_source(tmp_path: Path) -> None:
     )
 
     assert _paths_in_output(tmp_path, [output]) == ["src/server/bookingsRoute.ts"]
+
+
+def test_renamed_tasks_cannot_renew_the_diagnoses_forever(tmp_path: Path) -> None:
+    from ai_factory.auto_diagnosis import MAX_AUTO_DIAGNOSES_WITHOUT_HUMAN
+
+    root = _stuck_project(tmp_path)
+    state_path = root / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["replan_budget_resets"] = [{"at": "2026-10-16T10:00:00+00:00", "source": "web:retry"}]
+    developer[HISTORY_FIELD] = [
+        {"at": f"2026-10-16T11:0{index}:00+00:00", "task_id": f"OTHER-{index}", "cause": "x"}
+        for index in range(MAX_AUTO_DIAGNOSES_WITHOUT_HUMAN)
+    ]
+    save_state(state_path, state)
+
+    assert try_auto_diagnosis(root, Recorder(FIX)) is False
+
+    # A human action opens a new allowance.
+    state = load_state(state_path)
+    state["agents"]["developer"]["replan_budget_resets"].append(
+        {"at": "2026-10-16T12:00:00+00:00", "source": "web:request-changes"}
+    )
+    save_state(state_path, state)
+
+    assert try_auto_diagnosis(root, Recorder(FIX)) is True
