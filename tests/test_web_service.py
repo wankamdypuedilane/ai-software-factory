@@ -326,3 +326,28 @@ def test_known_errors_are_explained_in_french() -> None:
     assert quota.startswith("Ton compte OpenAI n'a plus de crédit.")
     assert "insufficient quota" in quota
     assert friendly_error("something else") == "something else"
+
+
+def test_attention_asks_the_owner_the_diagnosis_question(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Asked", "Une idée suffisamment longue.", "novice")
+
+    for step in ("product", "ux_ui", "architect"):
+        service.approve_step("asked", step)
+
+    state_path = tmp_path / "projects" / "asked" / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["status"] = "READY"
+    developer["last_result"]["repeated_failures"] = 1
+    developer["auto_diagnoses"] = [
+        {"task_id": "T", "cause": "Base injoignable.", "needs_human": True, "question": "PostgreSQL est-il démarré ?"}
+    ]
+    save_state(state_path, state)
+    service._job("asked").error = "NON_CONVERGING_IMPLEMENTATION: stopped."
+
+    pending = service.project_view("asked")["pending"]
+
+    assert pending["kind"] == "attention"
+    assert pending["reasons"] == ["PostgreSQL est-il démarré ?"]
+    assert pending["auto_fixes"] == [{"cause": "Base injoignable.", "needs_human": True}]

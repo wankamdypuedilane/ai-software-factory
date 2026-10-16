@@ -363,6 +363,19 @@ class MockProvider(
             blockers=[],
         )
 
+    def diagnose(
+        self,
+        prompt: str,
+    ) -> dict[str, Any]:
+        """Deterministic diagnosis so the automatic recovery can be exercised."""
+
+        return {
+            "cause": "Mock diagnosis of the repeated failure.",
+            "instruction": "Mock instruction: fix the failing test and continue all remaining MVP tasks.",
+            "needs_human": False,
+            "question": "",
+        }
+
     def validate_qa(
         self,
         prompt: str,
