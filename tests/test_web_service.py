@@ -205,3 +205,12 @@ def test_running_view_names_the_working_step(tmp_path: Path) -> None:
 
     assert pending["kind"] == "running"
     assert pending["started_at"] == "2026-10-16T03:00:00+00:00"
+
+
+def test_review_carries_the_owner_summary(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+
+    view = service.create_project("Summary", "Une idée suffisamment longue.", "novice")
+
+    assert view["pending"]["kind"] == "review"
+    assert view["pending"]["owner_summary"]["will_do"]

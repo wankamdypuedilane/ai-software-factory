@@ -158,6 +158,17 @@ class MockProvider(
             return AgentResult(
                 status="COMPLETED",
                 summary=summary,
+                owner_summary={
+                    "will_do": [
+                        "Demo mode: the scope of the first version is written down.",
+                    ],
+                    "wont_do": [
+                        "Demo mode: nothing is left out on purpose.",
+                    ],
+                    "assumptions": [
+                        "Demo mode: no real decision was made.",
+                    ],
+                },
             )
 
         if agent_name == "ux_ui":

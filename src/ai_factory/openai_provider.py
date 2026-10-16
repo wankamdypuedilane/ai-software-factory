@@ -711,6 +711,29 @@ def build_agent_result_schema() -> dict:
                     "additionalProperties": False,
                 },
             },
+            "owner_summary": {
+                "type": "object",
+                "properties": {
+                    "will_do": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "wont_do": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "assumptions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": [
+                    "will_do",
+                    "wont_do",
+                    "assumptions",
+                ],
+                "additionalProperties": False,
+            },
             "blockers": {
                 "type": "array",
                 "items": {
@@ -811,6 +834,7 @@ def build_agent_result_schema() -> dict:
             "implementation_requests",
             "questions",
             "question_details",
+            "owner_summary",
             "blockers",
             "handoff",
             "metadata",
@@ -823,6 +847,41 @@ def build_agent_result_schema() -> dict:
 # budget is configured. Raised from a real run where 16000 tokens truncated a
 # single command-line module.
 DEFAULT_IMPLEMENTATION_MAX_OUTPUT_TOKENS = 32000
+
+
+OWNER_SUMMARY_LIMITS = {
+    "will_do": 6,
+    "wont_do": 4,
+    "assumptions": 5,
+}
+
+
+def normalize_owner_summary(
+    raw: Any,
+) -> dict[str, list[str]]:
+    """Keep the owner summary's non-empty sentences, within its limits."""
+
+    if not isinstance(raw, dict):
+        return {}
+
+    summary: dict[str, list[str]] = {}
+
+    for key, limit in OWNER_SUMMARY_LIMITS.items():
+        values = raw.get(key)
+
+        if not isinstance(values, list):
+            continue
+
+        cleaned = [
+            value.strip()
+            for value in values
+            if isinstance(value, str) and value.strip()
+        ][:limit]
+
+        if cleaned:
+            summary[key] = cleaned
+
+    return summary
 
 
 def normalize_question_details(
@@ -1110,6 +1169,7 @@ class OpenAIProvider(DevelopmentModelProvider):
             + "  ],\n"
             + '  "questions": [],\n'
             + '  "question_details": [],\n'
+            + '  "owner_summary": {"will_do": [], "wont_do": [], "assumptions": []},\n'
             + '  "blockers": [],\n'
             + '  "handoff": null,\n'
             + '  "metadata": {}\n'
@@ -1137,6 +1197,16 @@ class OpenAIProvider(DevelopmentModelProvider):
             + "cannot be attributed to it.\n"
             + "- The Factory derives execution policy from these fields "
             + "only, never from the title or the purpose.\n"
+            + "Owner summary (owner_summary):\n"
+            + "- Written for a project owner who does not read code, in the "
+            + "language of the human input, with no file names, code or "
+            + "jargon.\n"
+            + "- will_do: up to 6 short sentences on what your step decided, "
+            + "built or verified, as it affects the product.\n"
+            + "- wont_do: up to 4 things deliberately left out of this "
+            + "version.\n"
+            + "- assumptions: up to 5 things you decided on the owner's "
+            + "behalf that they should check (example values, defaults).\n"
             + "Questions to the human:\n"
             + "- For every entry in questions, add one entry to "
             + "question_details with the same question text, a one-sentence "
@@ -1403,9 +1473,14 @@ class OpenAIProvider(DevelopmentModelProvider):
             if detail["question"] not in questions
         )
 
+        owner_summary = normalize_owner_summary(
+            data.get("owner_summary"),
+        )
+
         return AgentResult(
             status=status,
             summary=summary,
+            owner_summary=owner_summary,
             artifacts=artifacts,
             artifact_requests=artifact_requests,
             implementation_requests=implementation_requests,
