@@ -287,6 +287,7 @@ function renderProject(view) {
       <h1>${esc(p.label)} : étape terminée</h1>
       ${p.summary ? `<p class="lead">${esc(p.summary)}</p>` : ""}
       ${p.technology && p.technology.length ? technologyCard(p.technology) : ""}
+      ${autoFixes(p.auto_fixes)}
       ${ownerSummary(p.owner_summary)}
       ${detailedDocuments(p.outputs, view.profile)}
       <div id="viewer"></div>
@@ -304,6 +305,7 @@ function renderProject(view) {
       ${p.error ? `<div class="notice danger">${esc(p.error)}</div>` : ""}
       ${(p.reasons || []).filter(Boolean).length ? `<section class="card"><h2>Pourquoi</h2><ul>${p.reasons.filter(Boolean).map((r) => `<li>${esc(r)}</li>`).join("")}</ul></section>` : ""}
       ${(p.items || []).length ? `<section class="card"><h2>Problèmes trouvés</h2><ul>${p.items.map((i) => `<li><strong>${esc(i.id || "")}</strong> ${esc(i.title || i.description || "")} <span class="muted">${esc(i.severity || "")}</span></li>`).join("")}</ul></section>` : ""}
+      ${autoFixes(p.auto_fixes)}
       ${ownerSummary(p.owner_summary)}
       ${detailedDocuments(p.outputs, view.profile)}
       <div id="viewer"></div>
@@ -379,6 +381,14 @@ function questionCard(q, qi) {
 function bulletCard(title, hint, items, tone) {
   if (!items || !items.length) return "";
   return `<section class="card ${tone || ""}"><h2>${esc(title)}</h2>${hint ? `<p class="muted">${esc(hint)}</p>` : ""}<ul class="plain-list">${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></section>`;
+}
+
+function autoFixes(list) {
+  const fixes = (list || []).filter((fix) => fix && fix.cause);
+  if (!fixes.length) return "";
+  return `<section class="card"><h2>Corrigé automatiquement par la Factory</h2>
+    <p class="muted">L'agent a buté sur ces problèmes ; la Factory les a diagnostiqués et lui a donné la consigne elle-même.</p>
+    <ul class="plain-list">${fixes.map((fix) => `<li>${esc(fix.cause)}${fix.needs_human ? " <strong>(il faut ton avis)</strong>" : ""}</li>`).join("")}</ul></section>`;
 }
 
 function ownerSummary(summary) {

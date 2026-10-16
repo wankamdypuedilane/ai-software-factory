@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from ai_factory.agent_inputs import append_agent_input
+from ai_factory.auto_diagnosis import HISTORY_FIELD, has_diagnosis_left, latest_diagnosis
 from ai_factory.approval_runtime import apply_approval
 from ai_factory.approvals import APPROVAL_BY_AGENT
 from ai_factory.context_builder import load_agent_input
@@ -368,21 +370,7 @@ class FactoryService:
         heading: str,
         lines: list[str],
     ) -> None:
-        existing = load_agent_input(root, config, agent_name) or ""
-        path = get_product_input_path(root, config).with_name(f"{agent_name}.md")
-
-        if agent_name == "product":
-            path = get_product_input_path(root, config)
-
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            existing.rstrip()
-            + ("\n\n" if existing.strip() else "")
-            + f"## {heading}\n\n"
-            + "\n".join(lines)
-            + "\n",
-            encoding="utf-8",
-        )
+        append_agent_input(root, config, agent_name, heading, lines)
 
     def answer_questions(
         self,
@@ -565,6 +553,14 @@ class FactoryService:
         _, state_path, _ = self._paths(project_id)
         state = load_state(state_path)
 
+        # A blind retry of a stuck Developer repeats the same failure. While
+        # automatic diagnoses remain for the failing task, "retry" runs the
+        # workflow as it is: the guard stops it, the Factory diagnoses the
+        # cause and resumes with a precise instruction.
+        if agent_name == "developer" and has_diagnosis_left(state):
+            self.start_run(project_id)
+            return self.project_view(project_id)
+
         try:
             state = self._reopen(state, agent_name, "web:retry")
         except ValueError as error:
@@ -727,6 +723,11 @@ class FactoryService:
                 "owner_summary": last_result.get("owner_summary") or {},
                 "outputs": self._agent_outputs(state, name),
                 "error": job.error,
+                "auto_fixes": [
+                    {"cause": entry.get("cause", ""), "needs_human": bool(entry.get("needs_human"))}
+                    for entry in agents.get(name, {}).get(HISTORY_FIELD, []) or []
+                    if isinstance(entry, dict)
+                ],
             }
 
             if status == "BLOCKED":
@@ -777,10 +778,17 @@ class FactoryService:
                 and job.error
                 and is_budget_exhausted(state, name)
             ):
+                latest = latest_diagnosis(state) if name == "developer" else None
+                reasons = (
+                    [latest["question"]]
+                    if latest and latest.get("needs_human") and latest.get("question")
+                    else _blocking_reasons(last_result) or [job.error]
+                )
+
                 return {
                     **base,
                     "kind": "attention",
-                    "reasons": _blocking_reasons(last_result) or [job.error],
+                    "reasons": reasons,
                     "items": [],
                     "can_send_back": False,
                 }
@@ -862,6 +870,13 @@ FRIENDLY_ERRORS = (
         "minute puis clique sur « Relancer ». Si ça se répète, vérifie ton "
         "solde (Billing) et les limites du modèle (Limits) sur "
         "platform.openai.com.",
+    ),
+    (
+        "NON_CONVERGING",
+        "L'agent n'arrive pas à corriger ce problème tout seul, même après le "
+        "diagnostic automatique de la Factory. Lis le « Pourquoi » ci-dessous : "
+        "réponds-y avec « Donner une consigne », ou clique sur « Réessayer "
+        "l'étape ».",
     ),
     (
         "OPENAI_API_KEY",

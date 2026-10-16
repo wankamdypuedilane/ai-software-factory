@@ -14,6 +14,7 @@ from openai import (
     RateLimitError,
 )
 
+from ai_factory.auto_diagnosis import diagnosis_schema
 from ai_factory.blocker_contract import (
     BLOCKER_KIND_VALUES,
     BLOCKER_SCOPE_VALUES,
@@ -1128,6 +1129,30 @@ class OpenAIProvider(DevelopmentModelProvider):
         return self._parse_implementation_result(
             raw_output,
         )
+
+    def diagnose(
+        self,
+        prompt: str,
+    ) -> dict[str, Any]:
+        """Diagnose a Developer that stopped converging (auto_diagnosis)."""
+
+        raw_output = self._request(
+            prompt,
+            label="diagnosis",
+            schema_name="developer_diagnosis",
+            schema=diagnosis_schema(),
+            max_output_tokens=8000,
+        )
+
+        try:
+            value = json.loads(raw_output)
+        except ValueError as error:
+            raise ProviderResultError(
+                stage="diagnosis",
+                message=f"Diagnosis output is not valid JSON: {error}",
+            ) from error
+
+        return value if isinstance(value, dict) else {}
 
     def validate_qa(
         self,

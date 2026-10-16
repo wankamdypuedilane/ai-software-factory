@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from ai_factory.auto_diagnosis import try_auto_diagnosis
 from ai_factory.project_environment import project_environment
 from ai_factory.rework import mark_rework_addressed
 from ai_factory.validation_context import (
@@ -23,6 +24,7 @@ from ai_factory.devops_runtime import (
     run_devops_validation,
 )
 from ai_factory.replan_guard import (
+    NonConvergingImplementationError,
     assert_replan_budget,
     build_failure_signature,
     get_failure_signature,
@@ -1114,10 +1116,18 @@ def run_workflow(
         if agent_name is None:
             break
 
-        executed_agent, result = run_next_agent(
-            project_root=project_root,
-            provider=provider,
-        )
+        try:
+            executed_agent, result = run_next_agent(
+                project_root=project_root,
+                provider=provider,
+            )
+        except NonConvergingImplementationError:
+            # Before handing a stuck Developer to a human, let the Factory
+            # diagnose it once more, as an expert would (bounded per task).
+            if try_auto_diagnosis(project_root, provider):
+                continue
+
+            raise
 
         executions.append(
             (
