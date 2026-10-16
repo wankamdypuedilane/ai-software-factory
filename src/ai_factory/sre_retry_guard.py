@@ -28,6 +28,8 @@ QA, Security or DevOps behaviour changes.
 
 from typing import Any
 
+from ai_factory.rework import recovery_guidance
+
 from ai_factory.replan_guard import (
     next_repeated_failures,
     next_replan_count,
@@ -245,6 +247,7 @@ def assert_sre_retry_budget(
             "another provider call. Inspect the persisted SRE evidence, "
             "findings, blockers, observability readiness and incident "
             "readiness of the last attempt."
+            + recovery_guidance("sre")
         )
 
     count = get_sre_retry_count(state)
@@ -256,4 +259,5 @@ def assert_sre_retry_budget(
             "workflow stopped instead of spending another provider call. "
             "SRE does not modify the workspace, so a further attempt would "
             "evaluate the same product and operational state again."
+            + recovery_guidance("sre")
         )
