@@ -1,6 +1,7 @@
 import json
 from typing import Any
 
+from ai_factory.state_digest import digest_state
 from ai_factory.artifact_request import ArtifactGenerationTask
 
 
@@ -28,7 +29,7 @@ def build_artifact_prompt(
         repr(project),
         "",
         "## Workflow State",
-        repr(state),
+        repr(digest_state(state, task.agent_name)),
     ]
 
     if human_input:

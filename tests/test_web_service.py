@@ -375,3 +375,17 @@ def test_retry_of_a_stuck_developer_goes_through_the_diagnosis(tmp_path: Path) -
     assert developer["replan_budget_resets"][-1]["source"] == "auto:diagnosis"
     developer_input = (tmp_path / "projects" / "diag" / "knowledge" / "inputs" / "developer.md").read_text(encoding="utf-8")
     assert "Diagnostic automatique" in developer_input
+
+
+def test_new_projects_use_the_writing_model_for_documents(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.save_settings({"provider": "openai", "model": "strong", "writing_model": "mini"})
+    root = tmp_path / "projects" / "cheap"
+    service.provider_factory = lambda config: MockProvider()
+
+    service.create_project("Cheap", "Une idée suffisamment longue.", "novice")
+
+    config = load_state(root / ".factory" / "project.yaml")
+    assert config["ai"]["model"] == "strong"
+    assert config["ai"]["models"] == {"code": "strong", "writing": "mini"}
+    assert service.get_settings()["writing_model"] == "mini"

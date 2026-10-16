@@ -1,5 +1,6 @@
 from typing import Any
 
+from ai_factory.state_digest import digest_state
 from ai_factory.export_index import build_export_index
 from ai_factory.rework import format_rework_request
 
@@ -196,7 +197,7 @@ def build_implementation_prompt(
             repr(project),
             "",
             "## Workflow State",
-            repr(state),
+            repr(digest_state(state, task.agent_name)),
         ]
     )
 

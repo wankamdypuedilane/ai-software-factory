@@ -2985,3 +2985,48 @@ def test_a_plain_rate_limit_stays_retryable() -> None:
     from ai_factory.provider_errors import ProviderErrorKind
 
     assert classify_openai_error(_rate_limit_error()).kind is not ProviderErrorKind.PERMANENT_REQUEST
+
+
+def test_code_and_writing_can_use_different_models(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    provider = OpenAIProvider(
+        model="strong",
+        models={"code": "strong", "writing": "mini"},
+    )
+
+    assert provider.model_for("implementation") == "strong"
+    assert provider.model_for("diagnosis") == "strong"
+    assert provider.model_for("artifact") == "mini"
+    assert provider.model_for("QA") == "mini"
+
+    provider._agent_name = "developer"
+    assert provider.model_for(None) == "strong"
+    provider._agent_name = "product"
+    assert provider.model_for(None) == "mini"
+
+
+def test_without_models_every_call_uses_the_main_model(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    provider = OpenAIProvider(model="only")
+
+    assert {provider.model_for(label) for label in ("implementation", "artifact", None)} == {"only"}
+
+
+def test_the_chosen_model_is_sent_with_the_request(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    provider = OpenAIProvider(model="strong", models={"writing": "mini"})
+    sent = {}
+
+    class Response:
+        status = "completed"
+        output_text = "text"
+
+    def fake_create(kwargs):
+        sent.update(kwargs)
+        return Response()
+
+    monkeypatch.setattr(provider, "_create_response", fake_create)
+
+    provider.generate("write a document")
+
+    assert sent["model"] == "mini"

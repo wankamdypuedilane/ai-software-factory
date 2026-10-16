@@ -35,9 +35,12 @@ def create_provider(
         model = ai_config.get("model")
         settings = ai_config.get("settings", {})
 
+        models = ai_config.get("models")
+
         return OpenAIProvider(
             model=model,
             settings=settings,
+            models=models if isinstance(models, dict) else None,
         )
 
     raise ValueError(

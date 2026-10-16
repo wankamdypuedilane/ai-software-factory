@@ -1031,6 +1031,7 @@ class OpenAIProvider(DevelopmentModelProvider):
         self,
         model: str,
         settings: dict[str, Any] | None = None,
+        models: dict[str, str] | None = None,
     ) -> None:
         if not model:
             raise ValueError(
@@ -1039,6 +1040,15 @@ class OpenAIProvider(DevelopmentModelProvider):
 
         self.model = model
         self.settings = settings or {}
+        # Optional cheaper model for everything that is not code. A real
+        # project spent most of its budget on documents and reviews sent to
+        # the strongest model: `models: {code: ..., writing: ...}`.
+        self.models = {
+            role: name.strip()
+            for role, name in (models or {}).items()
+            if isinstance(role, str) and isinstance(name, str) and name.strip()
+        }
+        self._agent_name: str | None = None
 
         # Project-local .env first, then the Factory checkout's .env.
         for env_path in (
@@ -1094,6 +1104,19 @@ class OpenAIProvider(DevelopmentModelProvider):
         self.client = OpenAI(
             **client_kwargs,
         )
+
+    CODE_LABELS = frozenset({"implementation", "diagnosis"})
+    CODE_AGENTS = frozenset({"developer"})
+
+    def model_for(self, label: str | None) -> str:
+        """The model for one call: `code` for writing or fixing code (and the
+        Developer's plan), `writing` for every document and review."""
+
+        is_code = label in self.CODE_LABELS or (
+            label is None and self._agent_name in self.CODE_AGENTS
+        )
+        role = "code" if is_code else "writing"
+        return self.models.get(role) or self.model
 
     def generate(
         self,
@@ -1232,6 +1255,7 @@ class OpenAIProvider(DevelopmentModelProvider):
     ) -> AgentResult:
         """Execute an agent through OpenAI and return a structured result."""
 
+        self._agent_name = context.get("agent_name")
         prompt = build_agent_prompt(context)
 
         structured_prompt = (
@@ -1681,7 +1705,7 @@ class OpenAIProvider(DevelopmentModelProvider):
         """
 
         request_kwargs: dict[str, Any] = {
-            "model": self.model,
+            "model": self.model_for(label),
             "input": prompt,
         }
 
