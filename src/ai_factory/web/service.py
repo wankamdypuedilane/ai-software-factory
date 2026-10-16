@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ai_factory.agent_inputs import append_agent_input
-from ai_factory.auto_diagnosis import HISTORY_FIELD, latest_diagnosis
+from ai_factory.auto_diagnosis import HISTORY_FIELD, has_diagnosis_left, latest_diagnosis
 from ai_factory.approval_runtime import apply_approval
 from ai_factory.approvals import APPROVAL_BY_AGENT
 from ai_factory.context_builder import load_agent_input
@@ -552,6 +552,14 @@ class FactoryService:
         self._ensure_idle(project_id)
         _, state_path, _ = self._paths(project_id)
         state = load_state(state_path)
+
+        # A blind retry of a stuck Developer repeats the same failure. While
+        # automatic diagnoses remain for the failing task, "retry" runs the
+        # workflow as it is: the guard stops it, the Factory diagnoses the
+        # cause and resumes with a precise instruction.
+        if agent_name == "developer" and has_diagnosis_left(state):
+            self.start_run(project_id)
+            return self.project_view(project_id)
 
         try:
             state = self._reopen(state, agent_name, "web:retry")

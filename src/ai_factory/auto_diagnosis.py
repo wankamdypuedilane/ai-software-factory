@@ -344,18 +344,23 @@ def _attempts_for(developer: dict[str, Any], task_id: str) -> int:
     )
 
 
-def can_auto_diagnose(state: dict[str, Any], provider: Any) -> bool:
+def has_diagnosis_left(state: dict[str, Any]) -> bool:
+    """Whether a stopped Developer may still be diagnosed automatically."""
+
     developer = _developer(state)
     last_result = developer.get("last_result", {}) or {}
     task_id = str(last_result.get("failed_task_id") or last_result.get("failure_signature") or "")
 
     return (
-        callable(getattr(provider, "diagnose", None))
-        and developer.get("status") in RESETTABLE_STATUSES
+        developer.get("status") in RESETTABLE_STATUSES
         and is_budget_exhausted(state, "developer")
         and bool(task_id)
         and _attempts_for(developer, task_id) < MAX_AUTO_DIAGNOSES_PER_TASK
     )
+
+
+def can_auto_diagnose(state: dict[str, Any], provider: Any) -> bool:
+    return callable(getattr(provider, "diagnose", None)) and has_diagnosis_left(state)
 
 
 def try_auto_diagnosis(project_root: Path, provider: Any) -> bool:

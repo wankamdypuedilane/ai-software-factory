@@ -351,3 +351,27 @@ def test_attention_asks_the_owner_the_diagnosis_question(tmp_path: Path) -> None
     assert pending["kind"] == "attention"
     assert pending["reasons"] == ["PostgreSQL est-il démarré ?"]
     assert pending["auto_fixes"] == [{"cause": "Base injoignable.", "needs_human": True}]
+
+
+def test_retry_of_a_stuck_developer_goes_through_the_diagnosis(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Diag", "Une idée suffisamment longue.", "novice")
+
+    for step in ("product", "ux_ui", "architect"):
+        service.approve_step("diag", step)
+
+    state_path = tmp_path / "projects" / "diag" / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["status"] = "FAILED"
+    developer["last_result"].update({"failed_task_id": "T-1", "replan_count": 2, "repeated_failures": 1})
+    save_state(state_path, state)
+
+    view = service.retry_step("diag", "developer")
+
+    assert view["pending"]["kind"] == "review"
+    developer = load_state(state_path)["agents"]["developer"]
+    assert developer["auto_diagnoses"][-1]["task_id"] == "T-1"
+    assert developer["replan_budget_resets"][-1]["source"] == "auto:diagnosis"
+    developer_input = (tmp_path / "projects" / "diag" / "knowledge" / "inputs" / "developer.md").read_text(encoding="utf-8")
+    assert "Diagnostic automatique" in developer_input
