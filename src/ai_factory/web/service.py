@@ -342,7 +342,7 @@ class FactoryService:
                     for agent, result in executions
                 )
             except Exception as error:  # reported to the human, never raised
-                job.error = str(error) or error.__class__.__name__
+                job.error = friendly_error(str(error) or error.__class__.__name__)
                 job.log.append(traceback.format_exc(limit=3))
             finally:
                 with self._lock:
@@ -848,3 +848,33 @@ def _blocking_reasons(last_result: dict[str, Any]) -> list[str]:
     blocking = [blocker for blocker in blockers if blocker.get("blocking", True)]
 
     return [str(blocker["message"]).strip() for blocker in blocking or blockers]
+
+
+FRIENDLY_ERRORS = (
+    (
+        "insufficient quota",
+        "Ton compte OpenAI n'a plus de crédit. Ajoute du crédit dans "
+        "Billing sur platform.openai.com, puis clique sur « Relancer ».",
+    ),
+    (
+        "RATE_LIMITED",
+        "OpenAI limite le nombre de requêtes de ton compte. Attends une "
+        "minute puis clique sur « Relancer ». Si ça se répète, vérifie ton "
+        "solde (Billing) et les limites du modèle (Limits) sur "
+        "platform.openai.com.",
+    ),
+    (
+        "OPENAI_API_KEY",
+        "La clé OpenAI est absente ou invalide. Renseigne-la dans Réglages.",
+    ),
+)
+
+
+def friendly_error(message: str) -> str:
+    """Explain a known engine error in plain French, keeping the detail."""
+
+    for marker, explanation in FRIENDLY_ERRORS:
+        if marker.lower() in message.lower():
+            return f"{explanation}\n\nDétail technique : {message}"
+
+    return message

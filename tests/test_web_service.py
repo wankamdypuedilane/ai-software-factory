@@ -317,3 +317,12 @@ def test_a_step_stopped_by_the_guard_offers_a_retry(tmp_path: Path) -> None:
     view = service.retry_step("guarded", "developer")
 
     assert view["pending"]["kind"] == "review"
+
+
+def test_known_errors_are_explained_in_french() -> None:
+    from ai_factory.web.service import friendly_error
+
+    quota = friendly_error("[PERMANENT_REQUEST] OpenAI reports insufficient quota: the account has no credit left.")
+    assert quota.startswith("Ton compte OpenAI n'a plus de crédit.")
+    assert "insufficient quota" in quota
+    assert friendly_error("something else") == "something else"
