@@ -312,3 +312,36 @@ def test_mock_project_goes_through_rework_and_back_to_qa(
 
     assert "Agent: qa" in output
     assert "QA Gate status: READY_FOR_REVIEW" in output
+
+
+@pytest.mark.parametrize(
+    "module_name, assert_name, state_key, fields",
+    [
+        ("qa_retry_guard", "assert_qa_retry_budget", "qa", {"qa_repeated_failures": 1}),
+        ("security_retry_guard", "assert_security_retry_budget", "security", {"security_repeated_failures": 1}),
+        ("devops_retry_guard", "assert_devops_retry_budget", "devops", {"devops_repeated_failures": 1}),
+        ("sre_retry_guard", "assert_sre_retry_budget", "sre", {"sre_repeated_failures": 1}),
+    ],
+)
+def test_non_converging_validation_points_to_rework(
+    module_name, assert_name, state_key, fields
+) -> None:
+    import importlib
+
+    module = importlib.import_module(f"ai_factory.{module_name}")
+    state = {"agents": {state_key: {"last_result": dict(fields)}}}
+
+    with pytest.raises(ValueError) as error:
+        getattr(module, assert_name)(state)
+
+    assert f"ai-factory rework {state_key}" in str(error.value)
+    assert f"knowledge/inputs/{state_key}.md" in str(error.value)
+
+
+def test_validators_are_told_low_findings_do_not_fail() -> None:
+    from ai_factory.validation_context import VALIDATION_EXECUTION_RULES
+
+    assert any(
+        "Low or Informational" in rule
+        for rule in VALIDATION_EXECUTION_RULES
+    )

@@ -19,6 +19,8 @@ key paths and changes no Developer behaviour.
 
 from typing import Any
 
+from ai_factory.rework import recovery_guidance
+
 from ai_factory.qa_evidence import (
     describe_qa_evidence,
     qa_evidence_satisfied,
@@ -211,6 +213,7 @@ def assert_qa_retry_budget(
             "same failure. The workflow stopped instead of spending "
             "another provider call. Inspect the persisted QA evidence, "
             "defects and blockers of the last attempt."
+            + recovery_guidance("qa")
         )
 
     count = get_qa_retry_count(state)
@@ -222,4 +225,5 @@ def assert_qa_retry_budget(
             "workflow stopped instead of spending another provider call. "
             "QA does not modify the workspace, so a further attempt would "
             "validate the same artifacts again."
+            + recovery_guidance("qa")
         )

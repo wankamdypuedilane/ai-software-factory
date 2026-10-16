@@ -3,6 +3,7 @@ from pathlib import Path
 from ai_factory.rework import mark_rework_addressed
 from ai_factory.validation_context import (
     add_validation_evidence,
+    build_validation_outcome,
 )
 from ai_factory.agent_result import AgentResult
 from ai_factory.agent_runner import run_agent
@@ -558,11 +559,27 @@ def run_next_agent(
             retry_test_results=retry_test_results,
         )
 
+    artifact_context = context
+
+    validation_execution = {
+        "qa": qa_execution,
+        "security": security_execution,
+        "devops": devops_execution,
+        "sre": sre_execution,
+    }.get(agent_name)
+
+    if validation_execution is not None:
+        artifact_context = dict(context)
+        artifact_context["validation_outcome"] = build_validation_outcome(
+            agent_name,
+            validation_execution,
+        )
+
     generated_artifacts = run_artifact_generation(
         project_root=project_root,
         agent_name=agent_name,
         result=result,
-        context=context,
+        context=artifact_context,
         provider=provider,
     )
 

@@ -293,6 +293,20 @@ def request_rework(
     return update_project_phase(state)
 
 
+def recovery_guidance(
+    agent_name: str,
+) -> str:
+    """Tell the operator the two ways out of a stopped validation."""
+
+    return (
+        " Next step: if the reported items are genuine defects, send them "
+        f"to the Developer with 'ai-factory rework {agent_name}'. If they "
+        "are out of scope, record that decision in "
+        f"knowledge/inputs/{agent_name}.md and run "
+        f"'ai-factory retry {agent_name} --reset-replan-budget'."
+    )
+
+
 def mark_rework_addressed(
     state: dict[str, Any],
 ) -> dict[str, Any]:

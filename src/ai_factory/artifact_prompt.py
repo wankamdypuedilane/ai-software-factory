@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from ai_factory.artifact_request import ArtifactGenerationTask
@@ -36,6 +37,25 @@ def build_artifact_prompt(
                 "",
                 "## Human Input",
                 human_input.strip(),
+            ]
+        )
+
+    validation_outcome = context.get("validation_outcome")
+
+    if isinstance(validation_outcome, dict):
+        sections.extend(
+            [
+                "",
+                "## Validation Outcome Of This Cycle",
+                "This is what the Factory executed and decided in the "
+                "current cycle. Report exactly this outcome; it supersedes "
+                "any earlier result shown in the workflow state.",
+                json.dumps(
+                    validation_outcome,
+                    indent=2,
+                    ensure_ascii=False,
+                    default=str,
+                ),
             ]
         )
 
