@@ -643,8 +643,14 @@ def run_implementation_task(
     context: dict[str, Any],
     provider: ImplementationProvider,
     retry_test_results: list[dict[str, Any]] | None = None,
+    known_files: list[str] | None = None,
 ) -> ImplementationExecution:
-    """Execute and apply one focused implementation task."""
+    """Execute and apply one focused implementation task.
+
+    `known_files` names the files earlier units already implemented. They
+    are supplied to the model, so a unit builds on the code and the tests
+    that exist instead of guessing their interfaces.
+    """
 
     project_identity = resolve_project_identity(
         context
@@ -658,6 +664,12 @@ def run_implementation_task(
         get_default_workspace_context_paths(
             project_root
         )
+    )
+
+    workspace_paths.extend(
+        path
+        for path in (known_files or [])
+        if isinstance(path, str) and path.strip()
     )
 
     if retry_test_results:

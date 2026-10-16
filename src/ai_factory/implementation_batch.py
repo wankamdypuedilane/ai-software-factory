@@ -45,6 +45,57 @@ class ImplementationBatchResult:
     failed_task_id: str | None = None
 
 
+def _known_files(
+    project_root: Path,
+    context: dict[str, Any],
+    written_files: list[Path],
+) -> list[str]:
+    """Return the files implemented before the next unit runs.
+
+    Files from earlier Developer cycles come from the persisted result;
+    files from earlier units of this batch come from the batch itself, since
+    the state is only saved once the batch ends.
+    """
+
+    known: list[str] = []
+
+    state = context.get("state", {})
+    developer = (
+        state.get("agents", {}).get("developer", {})
+        if isinstance(state, dict)
+        else {}
+    )
+    last_result = (
+        developer.get("last_result", {})
+        if isinstance(developer, dict)
+        else {}
+    )
+    previous = (
+        last_result.get("implemented_files", [])
+        if isinstance(last_result, dict)
+        else []
+    )
+
+    if isinstance(previous, list):
+        known.extend(
+            path
+            for path in previous
+            if isinstance(path, str)
+        )
+
+    root = Path(project_root).resolve()
+
+    for written in written_files:
+        try:
+            relative = Path(written).resolve().relative_to(root)
+        except ValueError:
+            continue
+
+        known.append(relative.as_posix())
+
+    return list(dict.fromkeys(known))
+
+
 def run_implementation_batch(
     project_root: Path,
     agent_name: str,
@@ -116,6 +167,11 @@ def run_implementation_batch(
             context=context,
             provider=provider,
             retry_test_results=task_retry_results,
+            known_files=_known_files(
+                project_root=project_root,
+                context=context,
+                written_files=batch.written_files,
+            ),
         )
 
         result = execution.result

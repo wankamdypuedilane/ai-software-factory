@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from ai_factory.rework import mark_rework_addressed
 from ai_factory.validation_context import (
     add_validation_evidence,
 )
@@ -1026,6 +1027,9 @@ def run_next_agent(
 
         elif implementation_batch.test_failed:
             state["agents"][agent_name]["status"] = "FAILED"
+
+        else:
+            state = mark_rework_addressed(state)
 
         if (
             agent_name == "developer"

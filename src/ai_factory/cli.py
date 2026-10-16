@@ -37,6 +37,10 @@ from ai_factory.provider_errors import (
     ProviderResultError,
 )
 from ai_factory.provider_factory import create_provider
+from ai_factory.rework import (
+    REWORK_ITEM_FIELDS,
+    request_rework,
+)
 from ai_factory.result_renderer import render_agent_result
 from ai_factory.resume import resume_agent_with_input
 from ai_factory.runtime import (
@@ -248,6 +252,17 @@ def main() -> None:
     resume_parser.add_argument(
         "agent_name",
         help="Blocked agent to resume",
+    )
+
+    rework_parser = subparsers.add_parser(
+        "rework",
+        help="Send QA, Security, DevOps or SRE items back to the Developer",
+    )
+
+    rework_parser.add_argument(
+        "source",
+        choices=sorted(REWORK_ITEM_FIELDS),
+        help="Validation phase whose defects or findings must be fixed",
     )
 
     retry_parser = subparsers.add_parser(
@@ -567,6 +582,41 @@ def main() -> None:
 
         except (ValueError, KeyError) as error:
             parser.error(str(error))
+
+    elif args.command == "rework":
+        project_root = Path.cwd()
+        state_path = project_root / ".factory" / "state.yaml"
+
+        state = load_state(state_path)
+
+        try:
+            state = request_rework(
+                state,
+                args.source,
+            )
+        except ValueError as error:
+            parser.error(str(error))
+
+        save_state(
+            state_path,
+            state,
+        )
+
+        items = state["rework"]["items"]
+
+        print(
+            f"Sent {len(items)} item(s) from '{args.source}' back to the "
+            "Developer:"
+        )
+
+        for item in items:
+            label = item.get("title") or item.get("description") or ""
+            print(f"  - {item.get('id', '?')}: {label}")
+
+        print(
+            "Development and every validation phase after it were reopened."
+        )
+        print("Next: ai-factory run-workflow")
 
     elif args.command == "retry":
         project_root = Path.cwd()
