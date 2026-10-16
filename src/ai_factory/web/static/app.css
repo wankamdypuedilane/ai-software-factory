@@ -55,6 +55,7 @@ input[type=text], input[type=password], textarea, select {
   width: 100%; border: 1px solid #D5D9E0; border-radius: 10px; padding: 12px 14px; font-size: 16px; background: #fff;
 }
 textarea { line-height: 1.5; resize: vertical; }
+::placeholder { color: #9AA0AB; font-style: italic; opacity: 1; }
 
 .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
 .choice {

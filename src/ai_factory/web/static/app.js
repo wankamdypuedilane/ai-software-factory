@@ -91,13 +91,13 @@ async function showHome() {
         <h1>Qu'est-ce que tu veux construire&#8239;?</h1>
         <p class="lead">Décris ton idée avec tes mots. Une équipe d'agents (produit, design, architecture, code, tests, sécurité) te posera ses questions, puis construira le projet étape par étape. Tu valides chaque étape.</p>
       </div>
-      ${keyMissing ? '<div class="notice warn">Avant de commencer, ajoute ta clé OpenAI dans les <a href="#/settings">réglages</a>.</div>' : ""}
+      ${keyMissing ? '<div class="notice warn">Avant de commencer, ajoute ta clé OpenAI dans les <a href="#/settings">réglages</a>. Pour juste essayer, choisis le « Mode démo » dans les réglages : c\'est gratuit.</div>' : ""}
       <form class="card" id="new-project">
         <label class="field">Nom du projet
-          <input type="text" name="name" required maxlength="80" placeholder="Réservations Salon">
+          <input type="text" name="name" required maxlength="80" placeholder="Exemple : Réservations Salon">
         </label>
         <label class="field">Ton idée
-          <textarea name="idea" rows="5" required placeholder="Une application pour gérer les réservations de mon salon de coiffure : les clientes choisissent un créneau en ligne, je reçois une notification, et je vois mon planning de la semaine."></textarea>
+          <textarea name="idea" rows="5" required placeholder="Exemple : une application pour gérer les réservations de mon salon de coiffure. Les clientes choisissent un créneau en ligne, je reçois une notification et je vois mon planning de la semaine."></textarea>
         </label>
         <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">
           <legend class="field" style="font-weight:600;font-size:14px;margin-bottom:10px">Ton profil</legend>
