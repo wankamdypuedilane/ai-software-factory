@@ -24,6 +24,47 @@ def get_agent_specific_instruction(
     return None
 
 
+# How many rounds of questions an agent may ask before it has to decide.
+# A real run from the web interface showed the Product agent asking the
+# same questions again after every answer, so the project never moved.
+MAX_QUESTION_ROUNDS = 2
+
+ANSWERS_HEADING = "## Answers"
+
+
+def answered_questions_rules(
+    human_input: str,
+) -> list[str]:
+    """Rules that stop an agent from asking answered questions again."""
+
+    rounds = human_input.count(ANSWERS_HEADING)
+
+    if rounds < 1:
+        return []
+
+    rules = [
+        "",
+        "## Answered Questions",
+        "The project owner already answered the questions listed under "
+        "Answers in the Human Input. Treat every answer as a final "
+        "decision. Never ask them again, even reworded or split into "
+        "smaller questions.",
+        "Ask a new question only when it blocks your work and nothing in "
+        "the Human Input or the artifacts answers it.",
+    ]
+
+    if rounds >= MAX_QUESTION_ROUNDS:
+        rules.append(
+            f"The owner has already answered {rounds} rounds of questions. "
+            "Do not return NEEDS_INPUT and do not ask any question. Decide "
+            "every remaining open point yourself with the safest, simplest "
+            "option, write those decisions down as explicit assumptions in "
+            "your artifacts, and complete your work."
+        )
+
+    return rules
+
+
 def build_agent_prompt(
     context: dict[str, Any],
 ) -> str:
@@ -84,6 +125,8 @@ def build_agent_prompt(
                 human_input.strip(),
             ]
         )
+
+        sections.extend(answered_questions_rules(human_input))
 
     rework = context.get("rework_request")
 

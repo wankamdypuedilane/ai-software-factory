@@ -690,7 +690,14 @@ class FactoryService:
         job = self._job(project_id)
 
         if job.running:
-            return {"kind": "running"}
+            agent = get_next_agent(state)
+
+            return {
+                "kind": "running",
+                "agent": agent,
+                "label": STEP_LABELS.get(agent or "", ""),
+                "started_at": job.started_at,
+            }
 
         if state.get("project", {}).get("phase") == "completed":
             return {"kind": "completed"}

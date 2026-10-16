@@ -233,6 +233,7 @@ async function refresh(id) {
     const changed = JSON.stringify(view) !== JSON.stringify(currentView);
     currentView = view;
     if (changed) renderProject(view);
+    app.querySelectorAll("[data-elapsed]").forEach((el) => { el.textContent = elapsedText(el.dataset.elapsed); });
     if (view.running) pollTimer = setTimeout(() => refresh(id), 2000);
   } catch (error) {
     pollTimer = setTimeout(() => refresh(id), 4000);
@@ -264,8 +265,9 @@ function renderProject(view) {
   if (p.kind === "running") {
     body = `
       <span class="badge run"><span class="spinner" aria-hidden="true"></span>Les agents travaillent</span>
-      <h1>Étape en cours…</h1>
-      <p class="lead">Ça prend généralement une à quelques minutes. Cette page se met à jour toute seule.</p>`;
+      <h1>${p.label ? esc(p.label) + " en cours…" : "Étape en cours…"}</h1>
+      <p class="lead">Ça prend généralement une à quelques minutes. Cette page se met à jour toute seule.</p>
+      ${p.started_at ? `<p class="muted" data-elapsed="${esc(p.started_at)}">${elapsedText(p.started_at)}</p>` : ""}`;
   } else if (p.kind === "questions") {
     body = `
       <span class="badge wait">${esc(p.label)} · des questions pour toi</span>
@@ -274,7 +276,10 @@ function renderProject(view) {
       <form id="answers" style="display:flex;flex-direction:column;gap:16px">
         ${p.questions.map((q, qi) => questionCard(q, qi)).join("")}
         <div id="action-error"></div>
-        <div class="row"><button type="submit" class="btn primary">Envoyer mes réponses</button></div>
+        <div class="row">
+          <button type="submit" class="btn primary">Envoyer mes réponses</button>
+          <button type="button" class="btn" data-let-decide>Laisser l'agent décider</button>
+        </div>
       </form>`;
   } else if (p.kind === "review") {
     body = `
@@ -342,6 +347,12 @@ function renderProject(view) {
   bindProjectActions(view);
 }
 
+function elapsedText(startedAt) {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
+  if (seconds < 60) return "Démarré il y a " + seconds + " s";
+  return "Démarré il y a " + Math.floor(seconds / 60) + " min " + (seconds % 60) + " s";
+}
+
 function questionCard(q, qi) {
   const options = (q.options || []).map((o, oi) => `
     <button type="button" class="choice" data-q="${qi}" data-label="${esc(o.label)}" aria-pressed="${o.recommended ? "true" : "false"}">
@@ -397,6 +408,21 @@ function bindProjectActions(view) {
       app.querySelectorAll(`.choice[data-q="${button.dataset.q}"]`).forEach((other) => {
         other.setAttribute("aria-pressed", String(other === button));
       });
+    });
+  });
+
+  app.querySelectorAll("[data-let-decide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const collected = view.pending.questions.map((q) => {
+        const recommended = (q.options || []).find((o) => o.recommended);
+        return {
+          question: q.question,
+          answer: recommended
+            ? recommended.label + " (the owner let the agent decide: this recommended option is final)"
+            : "The owner lets the agent decide: choose the safest, simplest option and record it as an assumption.",
+        };
+      });
+      act(button, "Envoi…", () => api("POST", `/projects/${id}/answers`, { agent: view.pending.agent, answers: collected }));
     });
   });
 
