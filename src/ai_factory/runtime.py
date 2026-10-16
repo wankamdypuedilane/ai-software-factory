@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from ai_factory.project_environment import project_environment
 from ai_factory.rework import mark_rework_addressed
 from ai_factory.validation_context import (
     add_validation_evidence,
@@ -115,6 +116,15 @@ def run_next_agent(
     provider: ModelProvider,
 ) -> tuple[str, str]:
     """Determine and execute the next agent in the project workflow."""
+
+    with project_environment(project_root):
+        return _run_next_agent(project_root, provider)
+
+
+def _run_next_agent(
+    project_root: Path,
+    provider: ModelProvider,
+) -> tuple[str, str]:
 
     state_path = project_root / ".factory" / "state.yaml"
     state = load_state(state_path)
