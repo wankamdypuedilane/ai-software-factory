@@ -85,3 +85,33 @@ def test_every_validator_prompt_states_the_execution_rules() -> None:
         assert "Never report that you cannot execute tests" in prompt
         assert "local command-line tool" in prompt
         assert "import json" in prompt
+
+
+def test_build_validation_outcome_uses_executed_evidence() -> None:
+    from ai_factory.qa_result import QAResult
+    from ai_factory.qa_runtime import QAExecution
+    from ai_factory.test_runner import CommandExecutionResult
+    from ai_factory.validation_context import build_validation_outcome
+
+    execution = QAExecution(
+        result=QAResult(
+            summary="No defects.",
+            passed=True,
+            test_commands=["python -m pytest"],
+        ),
+        prompt="",
+        test_results=[
+            CommandExecutionResult(
+                command="python -m pytest",
+                returncode=0,
+                stdout="50 passed",
+                stderr="",
+            ),
+        ],
+    )
+
+    outcome = build_validation_outcome("qa", execution)
+
+    assert outcome["passed"] is True
+    assert outcome["items"] == []
+    assert outcome["executed_tests"][0]["stdout_tail"] == "50 passed"
