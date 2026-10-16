@@ -259,8 +259,8 @@ def test_repeated_resets_accumulate_without_surprises() -> None:
 
     reset_replan_budget(state)
 
-    # The developer is READY again, so the status check refuses first.
-    with pytest.raises(ReplanBudgetResetError, match="must be FAILED"):
+    # The developer is READY with a fresh budget: nothing to reopen.
+    with pytest.raises(ReplanBudgetResetError, match="still has"):
         reset_replan_budget(state)
 
     # Back to FAILED but with budget left: refused on the budget instead.

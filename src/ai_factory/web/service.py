@@ -31,6 +31,7 @@ from ai_factory.provider_factory import create_provider
 from ai_factory.providers import ModelProvider
 from ai_factory.replan_guard import (
     BUDGETED_AGENTS,
+    RESETTABLE_STATUSES,
     is_budget_exhausted,
     reset_replan_budget,
 )
@@ -523,12 +524,15 @@ class FactoryService:
         if agent_name in BUDGETED_AGENTS and is_budget_exhausted(
             state,
             agent_name,
-        ) and state.get("agents", {}).get(agent_name, {}).get("status") == "FAILED":
+        ) and state.get("agents", {}).get(agent_name, {}).get("status") in RESETTABLE_STATUSES:
             return reset_replan_budget(
                 state,
                 agent_name,
                 source=source,
             )
+
+        if state.get("agents", {}).get(agent_name, {}).get("status") == "READY":
+            return state
 
         return retry_agent(state, agent_name)
 
