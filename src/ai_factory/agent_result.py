@@ -52,6 +52,9 @@ class AgentResult:
     # recommended choice instead of a blank text box. Each entry:
     # {"question", "why", "options": [{"label", "detail", "recommended"}]}.
     question_details: list[dict[str, Any]] = field(default_factory=list)
+    # What the step means for a project owner who does not read code:
+    # {"will_do": [...], "wont_do": [...], "assumptions": [...]}.
+    owner_summary: dict[str, list[str]] = field(default_factory=dict)
     blockers: list[Blocker] = field(default_factory=list)
     handoff: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)

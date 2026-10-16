@@ -38,6 +38,7 @@ def apply_agent_result(
         "summary": result.summary,
         "questions": list(result.questions),
         "question_details": list(result.question_details),
+        "owner_summary": dict(result.owner_summary),
         "blockers": serialize_blockers(result.blockers),
         "handoff": result.handoff,
         "artifacts": [

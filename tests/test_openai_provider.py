@@ -214,6 +214,7 @@ def test_openai_provider_execute_uses_responses_api(
         "implementation_requests",
         "questions",
         "question_details",
+        "owner_summary",
         "blockers",
         "handoff",
         "metadata",
@@ -2861,3 +2862,20 @@ def test_agent_prompt_forbids_options_that_only_promise_information(monkeypatch)
     assert "only promises information later" in captured["prompt"]
     assert "needs_owner_text=true" in captured["prompt"]
     assert "Never block a first version on business data" in captured["prompt"]
+
+
+def test_owner_summary_keeps_sentences_within_limits() -> None:
+    from ai_factory.openai_provider import normalize_owner_summary
+
+    summary = normalize_owner_summary(
+        {
+            "will_do": [f"Point {index}" for index in range(10)] + ["  "],
+            "wont_do": [],
+            "assumptions": ["Prix d'exemple : coupe 35 €", 3],
+        }
+    )
+
+    assert len(summary["will_do"]) == 6
+    assert "wont_do" not in summary
+    assert summary["assumptions"] == ["Prix d'exemple : coupe 35 €"]
+    assert normalize_owner_summary("nope") == {}

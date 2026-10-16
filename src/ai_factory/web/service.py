@@ -720,6 +720,7 @@ class FactoryService:
                 "agent": name,
                 "label": STEP_LABELS[name],
                 "summary": last_result.get("summary", ""),
+                "owner_summary": last_result.get("owner_summary") or {},
                 "outputs": self._agent_outputs(state, name),
                 "error": job.error,
             }

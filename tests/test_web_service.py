@@ -231,3 +231,10 @@ def test_failed_step_with_exhausted_budget_can_be_reopened(tmp_path: Path, actio
 
     assert view["pending"]["agent"] == "developer"
     assert view["pending"]["kind"] == "review"
+def test_review_carries_the_owner_summary(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+
+    view = service.create_project("Summary", "Une idée suffisamment longue.", "novice")
+
+    assert view["pending"]["kind"] == "review"
+    assert view["pending"]["owner_summary"]["will_do"]

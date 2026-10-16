@@ -287,7 +287,8 @@ function renderProject(view) {
       <h1>${esc(p.label)} : étape terminée</h1>
       ${p.summary ? `<p class="lead">${esc(p.summary)}</p>` : ""}
       ${p.technology && p.technology.length ? technologyCard(p.technology) : ""}
-      ${p.outputs && p.outputs.length ? `<section class="card"><h2>Ce qui a été produit</h2><p class="muted">Clique sur un fichier pour le lire.</p>${outputsList(p.outputs)}</section>` : ""}
+      ${ownerSummary(p.owner_summary)}
+      ${detailedDocuments(p.outputs, view.profile)}
       <div id="viewer"></div>
       ${changesForm(p.agent)}
       <div id="action-error"></div>
@@ -303,7 +304,8 @@ function renderProject(view) {
       ${p.error ? `<div class="notice danger">${esc(p.error)}</div>` : ""}
       ${(p.reasons || []).filter(Boolean).length ? `<section class="card"><h2>Pourquoi</h2><ul>${p.reasons.filter(Boolean).map((r) => `<li>${esc(r)}</li>`).join("")}</ul></section>` : ""}
       ${(p.items || []).length ? `<section class="card"><h2>Problèmes trouvés</h2><ul>${p.items.map((i) => `<li><strong>${esc(i.id || "")}</strong> ${esc(i.title || i.description || "")} <span class="muted">${esc(i.severity || "")}</span></li>`).join("")}</ul></section>` : ""}
-      ${p.outputs && p.outputs.length ? `<section class="card"><h2>Documents de l'étape</h2>${outputsList(p.outputs)}</section>` : ""}
+      ${ownerSummary(p.owner_summary)}
+      ${detailedDocuments(p.outputs, view.profile)}
       <div id="viewer"></div>
       ${changesForm(p.agent)}
       <div id="action-error"></div>
@@ -372,6 +374,26 @@ function questionCard(q, qi) {
             <input type="text" data-free="${qi}" ${options ? "" : "required"}>
           </label>`}
     </section>`;
+}
+
+function bulletCard(title, hint, items, tone) {
+  if (!items || !items.length) return "";
+  return `<section class="card ${tone || ""}"><h2>${esc(title)}</h2>${hint ? `<p class="muted">${esc(hint)}</p>` : ""}<ul class="plain-list">${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></section>`;
+}
+
+function ownerSummary(summary) {
+  if (!summary) return "";
+  return bulletCard("Ce qui a été décidé", "", summary.will_do)
+    + bulletCard("À vérifier par toi", "L'agent a choisi ces points à ta place. Si l'un ne te convient pas, demande une modification.", summary.assumptions, "check")
+    + bulletCard("Pas dans cette première version", "", summary.wont_do);
+}
+
+function detailedDocuments(paths, profile) {
+  if (!paths || !paths.length) return "";
+  return `<details class="card" ${profile === "developer" ? "open" : ""}>
+    <summary><strong>Voir les documents détaillés (${paths.length})</strong> <span class="muted">— pour les curieux, pas besoin de les lire pour valider</span></summary>
+    ${outputsList(paths)}
+  </details>`;
 }
 
 function technologyCard(components) {
