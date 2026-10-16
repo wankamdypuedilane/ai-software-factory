@@ -120,3 +120,7 @@ pre.viewer { margin: 0; max-height: 520px; overflow: auto; background: #0F1115; 
 }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.plain-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; line-height: 1.5; }
+.card.check { border-color: #F0C98A; background: #FFFBF3; }
+details.card summary { cursor: pointer; list-style-position: inside; }
