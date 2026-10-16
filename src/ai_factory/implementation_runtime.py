@@ -6,6 +6,10 @@ from ai_factory.command_classification import (
     build_unknown_command_correction,
     normalize_command_categories,
 )
+from ai_factory.test_references import (
+    build_missing_reference_correction,
+    find_missing_test_references,
+)
 from ai_factory.blocker_contract import (
     blocking_blockers,
     demote_deferred_blockers,
@@ -866,6 +870,23 @@ def run_implementation_task(
             policy_corrections = build_missing_test_target_correction(
                 task_id=task.id,
                 missing_targets=missing_targets,
+            )
+
+            continue
+
+        missing_references = find_missing_test_references(
+            project_root,
+            {
+                file_change.path: file_change.content
+                for file_change in result.files
+                if file_change.operation != "delete"
+            },
+        )
+
+        if missing_references and not is_last_attempt:
+            policy_corrections = build_missing_reference_correction(
+                task_id=task.id,
+                missing=missing_references,
             )
 
             continue
