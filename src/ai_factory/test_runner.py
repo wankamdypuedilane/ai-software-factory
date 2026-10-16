@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 import os
 from pathlib import Path
-import subprocess
 
+from ai_factory.process_runner import run_shell_command
 from ai_factory.project_environment import active_project_environment
 from ai_factory.test_command_policy import (
     validate_test_command,
@@ -20,6 +20,8 @@ class CommandExecutionResult:
     def passed(self) -> bool:
         return self.returncode == 0
 
+
+TEST_COMMAND_TIMEOUT_SECONDS = 300
 
 DEFAULT_DATABASE_NAME = "factory_local"
 
@@ -73,17 +75,11 @@ def run_test_command(
             project_identity
         )
 
-    completed = subprocess.run(
+    completed = run_shell_command(
         command,
         cwd=project_root,
         env=env,
-        shell=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=300,
-        check=False,
+        timeout=TEST_COMMAND_TIMEOUT_SECONDS,
     )
 
     return CommandExecutionResult(

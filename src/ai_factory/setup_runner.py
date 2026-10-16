@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
+from ai_factory.process_runner import run_shell_command
 
 from ai_factory.setup_command_policy import (
     validate_setup_command,
 )
+
+
+SETUP_COMMAND_TIMEOUT_SECONDS = 600
 
 
 @dataclass
@@ -31,16 +34,11 @@ def run_setup_command(
         approved_native_packages=approved_native_packages,
     )
 
-    completed = subprocess.run(
+    completed = run_shell_command(
         command,
         cwd=project_root,
-        shell=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=300,
-        check=False,
+        env=None,
+        timeout=SETUP_COMMAND_TIMEOUT_SECONDS,
     )
 
     return SetupExecutionResult(

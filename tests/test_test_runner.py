@@ -75,7 +75,7 @@ def test_run_test_command_supplies_prisma_database_url(
         return Result()
 
     monkeypatch.setattr(
-        "ai_factory.test_runner.subprocess.run",
+        "ai_factory.test_runner.run_shell_command",
         fake_run,
     )
 
@@ -113,7 +113,7 @@ def test_run_test_command_supplies_database_url_to_node_tests(
         return Result()
 
     monkeypatch.setattr(
-        "ai_factory.test_runner.subprocess.run",
+        "ai_factory.test_runner.run_shell_command",
         fake_run,
     )
 
@@ -154,7 +154,7 @@ def test_run_test_command_preserves_existing_database_url(
         return Result()
 
     monkeypatch.setattr(
-        "ai_factory.test_runner.subprocess.run",
+        "ai_factory.test_runner.run_shell_command",
         fake_run,
     )
 
@@ -225,7 +225,7 @@ def test_run_test_command_derives_the_database_name_from_the_project(
         return Result()
 
     monkeypatch.setattr(
-        "ai_factory.test_runner.subprocess.run",
+        "ai_factory.test_runner.run_shell_command",
         fake_run,
     )
 
