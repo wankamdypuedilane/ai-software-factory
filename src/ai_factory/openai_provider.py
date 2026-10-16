@@ -664,6 +664,49 @@ def build_agent_result_schema() -> dict:
                     "type": "string",
                 },
             },
+            "question_details": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                        },
+                        "why": {
+                            "type": "string",
+                        },
+                        "options": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "label": {
+                                        "type": "string",
+                                    },
+                                    "detail": {
+                                        "type": "string",
+                                    },
+                                    "recommended": {
+                                        "type": "boolean",
+                                    },
+                                },
+                                "required": [
+                                    "label",
+                                    "detail",
+                                    "recommended",
+                                ],
+                                "additionalProperties": False,
+                            },
+                        },
+                    },
+                    "required": [
+                        "question",
+                        "why",
+                        "options",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
             "blockers": {
                 "type": "array",
                 "items": {
@@ -763,6 +806,7 @@ def build_agent_result_schema() -> dict:
             "artifact_requests",
             "implementation_requests",
             "questions",
+            "question_details",
             "blockers",
             "handoff",
             "metadata",
@@ -775,6 +819,73 @@ def build_agent_result_schema() -> dict:
 # budget is configured. Raised from a real run where 16000 tokens truncated a
 # single command-line module.
 DEFAULT_IMPLEMENTATION_MAX_OUTPUT_TOKENS = 32000
+
+
+def normalize_question_details(
+    raw: Any,
+) -> list[dict[str, Any]]:
+    """Keep well-formed question details, with exactly one recommendation.
+
+    Malformed entries are dropped rather than failing the whole result: the
+    plain question list still carries every question.
+    """
+
+    if not isinstance(raw, list):
+        return []
+
+    details: list[dict[str, Any]] = []
+
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+
+        question = entry.get("question")
+
+        if not isinstance(question, str) or not question.strip():
+            continue
+
+        options = []
+
+        for option in entry.get("options", []) or []:
+            if not isinstance(option, dict):
+                continue
+
+            label = option.get("label")
+
+            if not isinstance(label, str) or not label.strip():
+                continue
+
+            options.append(
+                {
+                    "label": label.strip(),
+                    "detail": str(option.get("detail") or "").strip(),
+                    "recommended": option.get("recommended") is True,
+                }
+            )
+
+        recommended = [
+            index
+            for index, option in enumerate(options)
+            if option["recommended"]
+        ]
+
+        # Exactly one recommendation: the first one claimed, else the first
+        # option, so an interface always has a default to preselect.
+        if options:
+            keep = recommended[0] if recommended else 0
+
+            for index, option in enumerate(options):
+                option["recommended"] = index == keep
+
+        details.append(
+            {
+                "question": question.strip(),
+                "why": str(entry.get("why") or "").strip(),
+                "options": options,
+            }
+        )
+
+    return details
 
 
 class OpenAIProvider(DevelopmentModelProvider):
@@ -993,6 +1104,7 @@ class OpenAIProvider(DevelopmentModelProvider):
             + "    }\n"
             + "  ],\n"
             + '  "questions": [],\n'
+            + '  "question_details": [],\n'
             + '  "blockers": [],\n'
             + '  "handoff": null,\n'
             + '  "metadata": {}\n'
@@ -1020,6 +1132,16 @@ class OpenAIProvider(DevelopmentModelProvider):
             + "cannot be attributed to it.\n"
             + "- The Factory derives execution policy from these fields "
             + "only, never from the title or the purpose.\n"
+            + "Questions to the human:\n"
+            + "- For every entry in questions, add one entry to "
+            + "question_details with the same question text, a one-sentence "
+            + "why in plain language, and 2 to 4 options.\n"
+            + "- Each option has a short label, a one-sentence detail that "
+            + "states its consequence (cost, effort, what the user gets), "
+            + "and recommended=true on exactly one option: the safest "
+            + "sensible default for someone who does not code.\n"
+            + "- Write questions and options in the language of the human "
+            + "input, without technical jargon unless the human uses it.\n"
             + "Do not wrap the JSON in Markdown code fences."
         )
 
@@ -1253,6 +1375,18 @@ class OpenAIProvider(DevelopmentModelProvider):
             if question not in questions
         )
 
+        question_details = normalize_question_details(
+            data.get("question_details", []),
+        )
+
+        # Every detailed question is also a plain question, so callers that
+        # only read `questions` (the CLI, the state) never miss one.
+        questions.extend(
+            detail["question"]
+            for detail in question_details
+            if detail["question"] not in questions
+        )
+
         return AgentResult(
             status=status,
             summary=summary,
@@ -1260,6 +1394,7 @@ class OpenAIProvider(DevelopmentModelProvider):
             artifact_requests=artifact_requests,
             implementation_requests=implementation_requests,
             questions=questions,
+            question_details=question_details,
             blockers=blockers,
             handoff=data.get("handoff"),
             metadata=data.get("metadata", {}),

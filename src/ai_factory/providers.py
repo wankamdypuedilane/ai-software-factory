@@ -98,7 +98,18 @@ class DevelopmentModelProvider(
 class MockProvider(
     DevelopmentModelProvider,
 ):
-    """Deterministic provider used for local execution and tests."""
+    """Deterministic provider used for local execution and tests.
+
+    With `ask_questions`, the Product agent first asks one structured
+    question and completes once the human input holds an answer, so the
+    question flow of an interface can be exercised without a model.
+    """
+
+    def __init__(
+        self,
+        ask_questions: bool = False,
+    ) -> None:
+        self.ask_questions = ask_questions
 
     def run(
         self,
@@ -110,6 +121,37 @@ class MockProvider(
             f"Mock execution completed for agent: "
             f"{agent_name}"
         )
+
+        if (
+            agent_name == "product"
+            and getattr(self, "ask_questions", False)
+            and "## Answers" not in (context.get("human_input") or "")
+        ):
+            question = "Who should be able to use the product?"
+
+            return AgentResult(
+                status="NEEDS_INPUT",
+                summary="The audience decides whether accounts are needed.",
+                questions=[question],
+                question_details=[
+                    {
+                        "question": question,
+                        "why": "It decides whether user accounts are needed.",
+                        "options": [
+                            {
+                                "label": "Anyone, without an account",
+                                "detail": "Simplest for users.",
+                                "recommended": True,
+                            },
+                            {
+                                "label": "Registered users only",
+                                "detail": "Adds sign-up and login.",
+                                "recommended": False,
+                            },
+                        ],
+                    }
+                ],
+            )
 
         if agent_name == "product":
             return AgentResult(
