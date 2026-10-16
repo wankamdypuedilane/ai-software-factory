@@ -22,7 +22,11 @@ from ai_factory.approval_runtime import apply_approval
 from ai_factory.approvals import APPROVAL_BY_AGENT
 from ai_factory.context_builder import load_agent_input
 from ai_factory.orchestrator import AGENT_ORDER, get_next_agent
-from ai_factory.project import get_product_input_path, initialize_project
+from ai_factory.project import (
+    get_product_input_path,
+    initialize_project,
+    project_slug,
+)
 from ai_factory.provider_factory import create_provider
 from ai_factory.providers import ModelProvider
 from ai_factory.replan_guard import (
@@ -101,12 +105,12 @@ def _now() -> str:
 
 
 def _slug(name: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-
-    if not slug:
-        raise ServiceError("Le nom du projet doit contenir des lettres ou des chiffres.")
-
-    return slug
+    try:
+        return project_slug(name)
+    except ValueError as error:
+        raise ServiceError(
+            "Le nom du projet doit contenir des lettres ou des chiffres."
+        ) from error
 
 
 @dataclass

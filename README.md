@@ -92,6 +92,25 @@ ai-factory --version
 python -m pytest -q
 ```
 
+## Web interface
+
+```bash
+ai-factory ui
+```
+
+This opens a local page in your browser (`http://127.0.0.1:8765`). Describe
+the product in plain words, choose whether you code or not, and the agents take
+it from there. Each question comes with a recommended answer, each phase ends
+with a **Validate** button or a change request, and defects found by QA or
+Security can be sent back to the Developer in one click.
+
+- Projects are created in `~/ai-factory-projects` (`--workspace` to change it).
+- Add your OpenAI key under **Réglages**; it is stored in
+  `~/.ai-factory/settings.json`, readable only by you. A free demo mode runs the
+  whole flow with the mock provider.
+- The server only listens on your machine and only accepts requests from its
+  own page.
+
 ## Example session (mock provider)
 
 This session takes a new project from `init` to `completed` without any API

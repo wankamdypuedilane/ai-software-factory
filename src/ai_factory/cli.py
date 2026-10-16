@@ -254,6 +254,30 @@ def main() -> None:
         help="Blocked agent to resume",
     )
 
+    ui_parser = subparsers.add_parser(
+        "ui",
+        help="Open the web interface in your browser",
+    )
+
+    ui_parser.add_argument(
+        "--workspace",
+        default=str(Path.home() / "ai-factory-projects"),
+        help="Folder where projects are created (default: ~/ai-factory-projects)",
+    )
+
+    ui_parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Local port (default: 8765)",
+    )
+
+    ui_parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open the browser automatically",
+    )
+
     rework_parser = subparsers.add_parser(
         "rework",
         help="Send QA, Security, DevOps or SRE items back to the Developer",
@@ -582,6 +606,16 @@ def main() -> None:
 
         except (ValueError, KeyError) as error:
             parser.error(str(error))
+
+    elif args.command == "ui":
+        from ai_factory.web.server import serve
+        from ai_factory.web.service import FactoryService
+
+        serve(
+            FactoryService(workspace=Path(args.workspace).expanduser()),
+            port=args.port,
+            open_browser=not args.no_browser,
+        )
 
     elif args.command == "rework":
         project_root = Path.cwd()

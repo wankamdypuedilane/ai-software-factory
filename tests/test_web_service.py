@@ -182,3 +182,12 @@ def test_a_failed_run_is_reported_not_raised(tmp_path: Path) -> None:
 
     assert view["running"] is False
     assert "OPENAI_API_KEY" in view["pending"]["error"]
+
+
+def test_project_name_with_accents_is_reachable(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+
+    view = service.create_project("Réservations Salon", "Une idée suffisamment longue.", "novice")
+
+    assert view["id"] == "reservations-salon"
+    assert view["name"] == "Réservations Salon"

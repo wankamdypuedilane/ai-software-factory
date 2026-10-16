@@ -123,3 +123,11 @@ def test_initialize_project_creates_product_input(tmp_path: Path) -> None:
     assert "# Product Input" in product_input.read_text(
         encoding="utf-8",
     )
+
+
+def test_project_slug_folds_accents_and_punctuation() -> None:
+    from ai_factory.project import project_slug
+
+    assert project_slug("Réservations Salon") == "reservations-salon"
+    assert project_slug("Todo CLI!") == "todo-cli"
+    assert project_slug("  Ride  Flow ") == "ride-flow"
