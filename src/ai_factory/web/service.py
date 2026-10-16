@@ -648,7 +648,7 @@ class FactoryService:
             ]
 
         return [
-            {"question": question, "why": "", "options": []}
+            {"question": question, "why": "", "needs_owner_text": True, "options": []}
             for question in last_result.get("questions", []) or []
             if isinstance(question, str) and question.strip()
         ]

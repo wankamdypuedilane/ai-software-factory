@@ -675,6 +675,9 @@ def build_agent_result_schema() -> dict:
                         "why": {
                             "type": "string",
                         },
+                        "needs_owner_text": {
+                            "type": "boolean",
+                        },
                         "options": {
                             "type": "array",
                             "items": {
@@ -702,6 +705,7 @@ def build_agent_result_schema() -> dict:
                     "required": [
                         "question",
                         "why",
+                        "needs_owner_text",
                         "options",
                     ],
                     "additionalProperties": False,
@@ -881,6 +885,7 @@ def normalize_question_details(
             {
                 "question": question.strip(),
                 "why": str(entry.get("why") or "").strip(),
+                "needs_owner_text": entry.get("needs_owner_text") is True,
                 "options": options,
             }
         )
@@ -1141,7 +1146,18 @@ class OpenAIProvider(DevelopmentModelProvider):
             + "and recommended=true on exactly one option: the safest "
             + "sensible default for someone who does not code.\n"
             + "- Write questions and options in the language of the human "
-            + "input, without technical jargon unless the human uses it.\n"
+            + "input, without technical jargon unless the human uses it.\n"            + "- Every option must be a complete answer you can act on "
+            + "immediately. Never offer an option that only promises "
+            + "information later (such as 'I will provide the list' or "
+            + "'decide later').\n"
+            + "- When the answer is information only the owner has (a list "
+            + "of services, prices, opening hours, names, texts), set "
+            + "needs_owner_text=true and make the options concrete example "
+            + "answers the owner can pick as they are.\n"
+            + "- Never block a first version on business data: make the "
+            + "recommended option 'use clearly marked example values that "
+            + "the owner edits later' and state those example values in "
+            + "its detail.\n"
             + "Do not wrap the JSON in Markdown code fences."
         )
 

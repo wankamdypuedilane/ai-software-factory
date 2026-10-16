@@ -355,7 +355,7 @@ function elapsedText(startedAt) {
 
 function questionCard(q, qi) {
   const options = (q.options || []).map((o, oi) => `
-    <button type="button" class="choice" data-q="${qi}" data-label="${esc(o.label)}" aria-pressed="${o.recommended ? "true" : "false"}">
+    <button type="button" class="choice" data-q="${qi}" data-label="${esc(o.label)}" data-detail="${esc(o.detail || "")}" aria-pressed="${o.recommended ? "true" : "false"}">
       <span class="row" style="gap:8px"><strong>${esc(o.label)}</strong>${o.recommended ? '<span class="tag ok">Recommandé</span>' : ""}</span>
       ${o.detail ? `<span>${esc(o.detail)}</span>` : ""}
     </button>`).join("");
@@ -364,9 +364,13 @@ function questionCard(q, qi) {
       <h2>${esc(q.question)}</h2>
       ${q.why ? `<p class="muted">${esc(q.why)}</p>` : ""}
       ${options ? `<div class="choices">${options}</div>` : ""}
-      <label class="field">${options ? "Ou ta propre réponse (facultatif)" : "Ta réponse"}
-        <input type="text" data-free="${qi}" ${options ? "" : "required"}>
-      </label>
+      ${q.needs_owner_text
+        ? `<label class="field">Ta réponse (c'est une information que toi seul connais)
+            <textarea data-free="${qi}" rows="4" placeholder="Écris-la ici, ou choisis une option ci-dessus."></textarea>
+          </label>`
+        : `<label class="field">${options ? "Ou ta propre réponse (facultatif)" : "Ta réponse"}
+            <input type="text" data-free="${qi}" ${options ? "" : "required"}>
+          </label>`}
     </section>`;
 }
 
@@ -418,7 +422,7 @@ function bindProjectActions(view) {
         return {
           question: q.question,
           answer: recommended
-            ? recommended.label + " (the owner let the agent decide: this recommended option is final)"
+            ? recommended.label + (recommended.detail ? " — " + recommended.detail : "") + " (the owner let the agent decide: this recommended option is final)"
             : "The owner lets the agent decide: choose the safest, simplest option and record it as an assumption.",
         };
       });
@@ -434,7 +438,10 @@ function bindProjectActions(view) {
         const qi = card.dataset.question;
         const free = card.querySelector(`[data-free="${qi}"]`).value.trim();
         const picked = card.querySelector(`.choice[data-q="${qi}"][aria-pressed="true"]`);
-        return { question: card.dataset.text, answer: free || (picked ? picked.dataset.label : "") };
+        const chosen = picked
+          ? picked.dataset.label + (picked.dataset.detail ? " — " + picked.dataset.detail : "")
+          : "";
+        return { question: card.dataset.text, answer: free || chosen };
       });
       const submit = answers.querySelector('button[type="submit"]');
       act(submit, "Envoi…", () => api("POST", `/projects/${id}/answers`, { agent: view.pending.agent, answers: collected }));
