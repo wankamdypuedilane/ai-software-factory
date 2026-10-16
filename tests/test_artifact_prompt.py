@@ -195,3 +195,30 @@ def test_build_artifact_prompt_orders_upstream_artifacts_before_instructions() -
 
     assert UPSTREAM_INSTRUCTION in instructions
     assert instructions.rstrip().endswith(UPSTREAM_INSTRUCTION)
+
+
+def test_artifact_prompt_reports_the_current_validation_outcome() -> None:
+    from ai_factory.artifact_prompt import build_artifact_prompt
+    from ai_factory.artifact_request import ArtifactGenerationTask
+
+    prompt = build_artifact_prompt(
+        ArtifactGenerationTask(
+            agent_name="qa",
+            path="knowledge/qa/qa-report.md",
+            purpose="Record the QA verdict.",
+        ),
+        {
+            "state": {"agents": {"qa": {"last_result": {"qa_passed": False}}}},
+            "validation_outcome": {
+                "agent": "qa",
+                "passed": True,
+                "executed_tests": [
+                    {"command": "python -m pytest", "stdout_tail": "50 passed"},
+                ],
+            },
+        },
+    )
+
+    assert "## Validation Outcome Of This Cycle" in prompt
+    assert "50 passed" in prompt
+    assert "supersedes any earlier result" in prompt

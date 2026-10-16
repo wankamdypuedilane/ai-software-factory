@@ -147,3 +147,51 @@ def add_validation_evidence(
     enriched["validation_rules"] = list(VALIDATION_EXECUTION_RULES)
 
     return enriched
+
+
+def build_validation_outcome(
+    agent_name: str,
+    execution: Any,
+) -> dict[str, Any]:
+    """Describe this cycle's validation outcome for the agent's report.
+
+    The report is generated after the validation ran, but from a context
+    built before it, whose workflow state still holds the previous cycle. A
+    real run produced a QA report saying "46 tests, do not approve" next to a
+    gate that had just passed 50 tests.
+    """
+
+    result = execution.result
+
+    items: list[Any] = []
+
+    for field_name in ("defects", "findings", "changes"):
+        values = getattr(result, field_name, None)
+
+        if isinstance(values, list):
+            items.extend(
+                getattr(value, "__dict__", value)
+                for value in values
+            )
+
+    return {
+        "agent": agent_name,
+        "passed": bool(execution.passed),
+        "summary": getattr(result, "summary", ""),
+        "items": items,
+        "blockers": [
+            getattr(blocker, "__dict__", blocker)
+            for blocker in getattr(result, "blockers", []) or []
+        ],
+        "executed_tests": [
+            {
+                "command": test_result.command,
+                "returncode": test_result.returncode,
+                "passed": test_result.returncode == 0,
+                "stdout_tail": (
+                    test_result.stdout or ""
+                )[-MAX_TEST_OUTPUT_TAIL_CHARS:],
+            }
+            for test_result in getattr(execution, "test_results", []) or []
+        ],
+    }
