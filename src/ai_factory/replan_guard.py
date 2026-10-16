@@ -252,6 +252,9 @@ def is_budget_exhausted(
     )
 
 
+RESETTABLE_STATUSES = frozenset({"FAILED", "BLOCKED", "READY"})
+
+
 def reset_replan_budget(
     state: dict[str, Any],
     agent_name: str = "developer",
@@ -283,11 +286,14 @@ def reset_replan_budget(
     agent = agents[agent_name]
     status = agent.get("status")
 
-    if status != "FAILED":
+    # BLOCKED and READY count too: a real run stopped BLOCKED with a
+    # repeated signature, and an instruction from the human then never
+    # reached the model, because the guard refused the cycle before it.
+    if status not in RESETTABLE_STATUSES:
         raise ReplanBudgetResetError(
-            f"Agent '{agent_name}' must be FAILED to reopen its replanning "
-            f"budget; it is {status}. A running or approved agent is never "
-            "reset."
+            f"Agent '{agent_name}' must be FAILED, BLOCKED or READY to "
+            f"reopen its replanning budget; it is {status}. A running, "
+            "reviewed or approved agent is never reset."
         )
 
     count, repeated, signature = get_budget_counters(

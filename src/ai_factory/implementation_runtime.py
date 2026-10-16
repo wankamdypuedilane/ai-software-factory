@@ -8,6 +8,7 @@ from ai_factory.command_classification import (
 )
 from ai_factory.blocker_contract import (
     blocking_blockers,
+    demote_deferred_blockers,
     normalize_blockers,
 )
 from ai_factory.generated_file_validation import (
@@ -644,6 +645,7 @@ def run_implementation_task(
     provider: ImplementationProvider,
     retry_test_results: list[dict[str, Any]] | None = None,
     known_files: list[str] | None = None,
+    later_tasks: list[ImplementationTask] | None = None,
 ) -> ImplementationExecution:
     """Execute and apply one focused implementation task.
 
@@ -756,6 +758,7 @@ def run_implementation_task(
             failed_attempt_generated_paths=failed_attempt_generated_paths,
             failed_attempt_paths=failed_attempt_paths,
             policy_corrections=policy_corrections,
+            later_tasks=later_tasks,
         )
 
         result = provider.implement(
@@ -780,6 +783,14 @@ def run_implementation_task(
         # blocker contract and never reaches this point as blocking.
         result.blockers, _ = normalize_blockers(
             result.blockers
+        )
+
+        # Work a later unit of the same plan will do is not an impediment:
+        # a real run stopped because the routes to protect "did not exist
+        # yet", while the next two units of its own plan create them.
+        result.blockers = demote_deferred_blockers(
+            result.blockers,
+            [later.id for later in later_tasks or []],
         )
 
         if blocking_blockers(result.blockers):

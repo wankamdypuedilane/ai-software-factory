@@ -105,6 +105,34 @@ def normalize_blockers(
     return normalized, questions
 
 
+def demote_deferred_blockers(
+    blockers: list[Blocker],
+    later_task_ids: list[str],
+) -> list[Blocker]:
+    """Demote a blocker that only defers work to a later unit of the plan.
+
+    The plan already schedules that work, so it cannot need a human: the
+    message is kept, as information, and the batch moves on to that unit.
+    """
+
+    ids = [task_id for task_id in later_task_ids if task_id]
+
+    if not ids:
+        return blockers
+
+    return [
+        replace(
+            blocker,
+            kind=BlockerKind.INFORMATION,
+            blocking=False,
+            requires_human_input=False,
+        )
+        if blocker.blocking and any(task_id in blocker.message for task_id in ids)
+        else blocker
+        for blocker in blockers
+    ]
+
+
 def coerce_blocker(
     value: Any,
 ) -> Blocker | None:

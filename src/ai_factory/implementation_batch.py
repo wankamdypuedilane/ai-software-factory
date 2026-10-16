@@ -152,7 +152,7 @@ def run_implementation_batch(
 
     batch = ImplementationBatchResult()
 
-    for task in tasks:
+    for index, task in enumerate(tasks):
         task_retry_results = None
 
         if (
@@ -167,6 +167,7 @@ def run_implementation_batch(
             context=context,
             provider=provider,
             retry_test_results=task_retry_results,
+            later_tasks=tasks[index + 1:],
             known_files=_known_files(
                 project_root=project_root,
                 context=context,

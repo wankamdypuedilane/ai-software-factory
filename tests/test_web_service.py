@@ -238,3 +238,56 @@ def test_review_carries_the_owner_summary(tmp_path: Path) -> None:
 
     assert view["pending"]["kind"] == "review"
     assert view["pending"]["owner_summary"]["will_do"]
+
+
+def test_attention_names_the_unit_that_actually_blocked(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Blocked", "Une idée suffisamment longue.", "novice")
+
+    for step in ("product", "ux_ui", "architect"):
+        service.approve_step("blocked", step)
+
+    state_path = tmp_path / "projects" / "blocked" / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["status"] = "BLOCKED"
+    developer["last_result"]["blockers"] = [
+        {"message": "Planning note", "blocking": False},
+    ]
+    developer["last_result"]["implementation_blockers"] = [
+        {
+            "task_id": "RS-MVP-006",
+            "blockers": [{"message": "Routes missing", "blocking": True}],
+        }
+    ]
+    save_state(state_path, state)
+
+    pending = service.project_view("blocked")["pending"]
+
+    assert pending["kind"] == "attention"
+    assert pending["reasons"] == ["RS-MVP-006 : Routes missing"]
+
+
+@pytest.mark.parametrize("status", ["BLOCKED", "READY"])
+def test_an_instruction_reaches_a_stopped_developer(tmp_path: Path, status: str) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Halted", "Une idée suffisamment longue.", "novice")
+
+    for step in ("product", "ux_ui", "architect"):
+        service.approve_step("halted", step)
+
+    state_path = tmp_path / "projects" / "halted" / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["status"] = status
+    developer["last_result"]["replan_count"] = 2
+    developer["last_result"]["repeated_failures"] = 1
+    developer["last_result"]["failure_signature"] = "blocked"
+    save_state(state_path, state)
+
+    view = service.request_changes("halted", "developer", "Ce n'est pas un blocage.")
+
+    assert view["pending"]["agent"] == "developer"
+    assert view["pending"]["kind"] == "review"
+    resets = load_state(state_path)["agents"]["developer"]["replan_budget_resets"]
+    assert resets[-1]["source"] == "web:request-changes"

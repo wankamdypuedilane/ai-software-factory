@@ -31,6 +31,7 @@ from ai_factory.provider_factory import create_provider
 from ai_factory.providers import ModelProvider
 from ai_factory.replan_guard import (
     BUDGETED_AGENTS,
+    RESETTABLE_STATUSES,
     is_budget_exhausted,
     reset_replan_budget,
 )
@@ -523,12 +524,15 @@ class FactoryService:
         if agent_name in BUDGETED_AGENTS and is_budget_exhausted(
             state,
             agent_name,
-        ) and state.get("agents", {}).get(agent_name, {}).get("status") == "FAILED":
+        ) and state.get("agents", {}).get(agent_name, {}).get("status") in RESETTABLE_STATUSES:
             return reset_replan_budget(
                 state,
                 agent_name,
                 source=source,
             )
+
+        if state.get("agents", {}).get(agent_name, {}).get("status") == "READY":
+            return state
 
         return retry_agent(state, agent_name)
 
@@ -734,11 +738,7 @@ class FactoryService:
                 return {
                     **base,
                     "kind": "attention",
-                    "reasons": [
-                        blocker.get("message", "")
-                        for blocker in last_result.get("blockers", []) or []
-                        if isinstance(blocker, dict)
-                    ],
+                    "reasons": _blocking_reasons(last_result),
                 }
 
             if status == "REVIEW_REQUIRED" and self._review_ready(state, name):
@@ -797,3 +797,38 @@ class FactoryService:
             "next_agent": get_next_agent(state),
             "files": self.list_files(project_id),
         }
+
+
+def _blocking_reasons(last_result: dict[str, Any]) -> list[str]:
+    """Return what actually stopped the step, most specific first.
+
+    A Developer stop comes from one implementation unit. Its blockers are
+    the real cause; the agent-level ones are planning notes, often
+    non-blocking, which a real run showed in place of the actual reason.
+    """
+
+    reasons: list[str] = []
+
+    for item in last_result.get("implementation_blockers", []) or []:
+        if not isinstance(item, dict):
+            continue
+
+        for blocker in item.get("blockers", []) or []:
+            if isinstance(blocker, dict) and blocker.get("blocking", True):
+                message = str(blocker.get("message", "")).strip()
+
+                if message:
+                    task = item.get("task_id")
+                    reasons.append(f"{task} : {message}" if task else message)
+
+    if reasons:
+        return reasons
+
+    blockers = [
+        blocker
+        for blocker in last_result.get("blockers", []) or []
+        if isinstance(blocker, dict) and str(blocker.get("message", "")).strip()
+    ]
+    blocking = [blocker for blocker in blockers if blocker.get("blocking", True)]
+
+    return [str(blocker["message"]).strip() for blocker in blocking or blockers]
