@@ -31,9 +31,18 @@ def test_truncate_test_output_truncates_long_output() -> None:
         max_chars=100,
     )
 
-    assert result.startswith("A" * 100)
-    assert "[Test output truncated]" in result
+    assert result.startswith("A" * 40)
+    assert "[Test output truncated: 4900 characters omitted]" in result
     assert len(result) < len(value)
+
+
+def test_truncate_test_output_keeps_the_final_assertion() -> None:
+    value = "ran tests\n" + "noise\n" * 2000 + "AssertionError: not reference-equal"
+
+    result = truncate_test_output(value, max_chars=500)
+
+    assert result.startswith("ran tests")
+    assert result.endswith("AssertionError: not reference-equal")
 
 
 def test_serialize_test_result() -> None:

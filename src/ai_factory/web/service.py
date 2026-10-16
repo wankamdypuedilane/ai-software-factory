@@ -498,17 +498,7 @@ class FactoryService:
         )
 
         try:
-            if agent_name in BUDGETED_AGENTS and is_budget_exhausted(
-                state,
-                agent_name,
-            ):
-                state = reset_replan_budget(
-                    state,
-                    agent_name,
-                    source="web:request-changes",
-                )
-
-            state = retry_agent(state, agent_name)
+            state = self._reopen(state, agent_name, "web:request-changes")
         except ValueError as error:
             raise ServiceError(str(error)) from error
 
@@ -517,6 +507,30 @@ class FactoryService:
         self.start_run(project_id)
 
         return self.project_view(project_id)
+
+    def _reopen(
+        self,
+        state: dict[str, Any],
+        agent_name: str,
+        source: str,
+    ) -> dict[str, Any]:
+        """Put an agent back to READY, reopening an exhausted budget once.
+
+        Reopening a budget already sets the agent READY; retrying it on top
+        of that is refused by the engine, so only one of the two applies.
+        """
+
+        if agent_name in BUDGETED_AGENTS and is_budget_exhausted(
+            state,
+            agent_name,
+        ) and state.get("agents", {}).get(agent_name, {}).get("status") == "FAILED":
+            return reset_replan_budget(
+                state,
+                agent_name,
+                source=source,
+            )
+
+        return retry_agent(state, agent_name)
 
     def send_back(
         self,
@@ -548,17 +562,7 @@ class FactoryService:
         state = load_state(state_path)
 
         try:
-            if agent_name in BUDGETED_AGENTS and is_budget_exhausted(
-                state,
-                agent_name,
-            ):
-                state = reset_replan_budget(
-                    state,
-                    agent_name,
-                    source="web:retry",
-                )
-
-            state = retry_agent(state, agent_name)
+            state = self._reopen(state, agent_name, "web:retry")
         except ValueError as error:
             raise ServiceError(str(error)) from error
 

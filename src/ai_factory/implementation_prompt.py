@@ -50,6 +50,25 @@ def _truncate(
     )
 
 
+def _head_and_tail(
+    content: str,
+    limit: int,
+) -> str:
+    """Trim test output to its budget, keeping both of its ends."""
+
+    if len(content) <= limit:
+        return content
+
+    head = limit * 2 // 5
+    tail = limit - head
+
+    return (
+        content[:head]
+        + f"\n[truncated: {len(content) - head - tail} characters omitted]\n"
+        + content[-tail:]
+    )
+
+
 def _budgeted_blocks(
     items: dict[str, str],
     per_item: int,
@@ -365,13 +384,13 @@ def build_implementation_prompt(
                     f"Return code: {returncode}",
                     "",
                     "### stdout",
-                    _truncate(
+                    _head_and_tail(
                         str(stdout).strip(),
                         MAX_TEST_OUTPUT_CHARS,
                     ),
                     "",
                     "### stderr",
-                    _truncate(
+                    _head_and_tail(
                         str(stderr).strip(),
                         MAX_TEST_OUTPUT_CHARS,
                     ),

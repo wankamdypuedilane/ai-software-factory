@@ -18,9 +18,17 @@ def truncate_test_output(
     if len(value) <= max_chars:
         return value
 
+    # Keep both ends: runners print what ran at the top and the assertion
+    # that explains a failure at the bottom. A real run kept only the top
+    # and cut the one line the Developer needed, twice in a row.
+    head = max_chars * 2 // 5
+    tail = max_chars - head
+    omitted = len(value) - head - tail
+
     return (
-        value[:max_chars].rstrip()
-        + "\n\n[Test output truncated]"
+        value[:head].rstrip()
+        + f"\n\n[Test output truncated: {omitted} characters omitted]\n\n"
+        + value[-tail:].lstrip()
     )
 
 

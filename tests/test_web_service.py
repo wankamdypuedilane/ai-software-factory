@@ -205,3 +205,29 @@ def test_running_view_names_the_working_step(tmp_path: Path) -> None:
 
     assert pending["kind"] == "running"
     assert pending["started_at"] == "2026-10-16T03:00:00+00:00"
+
+
+@pytest.mark.parametrize("action", ["retry", "changes"])
+def test_failed_step_with_exhausted_budget_can_be_reopened(tmp_path: Path, action: str) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Stuck", "Une idée suffisamment longue.", "novice")
+
+    for step in ("product", "ux_ui", "architect"):
+        service.approve_step("stuck", step)
+
+    state_path = tmp_path / "projects" / "stuck" / ".factory" / "state.yaml"
+    state = load_state(state_path)
+    developer = state["agents"]["developer"]
+    developer["status"] = "FAILED"
+    developer["last_result"]["replan_count"] = 3
+    developer["last_result"]["repeated_failures"] = 1
+    developer["last_result"]["failure_signature"] = "test_failed|npm test"
+    save_state(state_path, state)
+
+    if action == "retry":
+        view = service.retry_step("stuck", "developer")
+    else:
+        view = service.request_changes("stuck", "developer", "Return plain objects.")
+
+    assert view["pending"]["agent"] == "developer"
+    assert view["pending"]["kind"] == "review"
