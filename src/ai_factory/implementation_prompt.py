@@ -70,6 +70,25 @@ def _head_and_tail(
     )
 
 
+TEST_HELPER_MARKERS = ("/helpers/", "/fixtures/", "/support/", "test-utils", "conftest.py")
+
+
+def _helpers_first(files: dict[str, str]) -> dict[str, str]:
+    """Put shared test helpers first so the budget never drops them.
+
+    A real unit guessed `database.pool` and `database.close()` on a helper
+    that returns `{ env, dispose }`: its content had been cut. Helpers are
+    small and every new test uses them, so they are always shown whole.
+    """
+
+    def is_helper(path: str) -> bool:
+        normalized = "/" + path.replace("\\", "/")
+        return any(marker in normalized for marker in TEST_HELPER_MARKERS)
+
+    helpers = {path: content for path, content in files.items() if is_helper(path)}
+    return {**helpers, **{p: c for p, c in files.items() if p not in helpers}}
+
+
 def _budgeted_blocks(
     items: dict[str, str],
     per_item: int,
@@ -285,7 +304,7 @@ def build_implementation_prompt(
             )
 
         workspace_blocks, dropped_workspace = _budgeted_blocks(
-            workspace_files,
+            _helpers_first(workspace_files),
             MAX_WORKSPACE_FILE_CHARS,
             MAX_WORKSPACE_FILES_TOTAL_CHARS,
         )

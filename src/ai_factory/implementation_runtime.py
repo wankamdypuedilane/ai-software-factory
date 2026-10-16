@@ -6,6 +6,12 @@ from ai_factory.command_classification import (
     build_unknown_command_correction,
     normalize_command_categories,
 )
+from ai_factory.test_references import (
+    build_missing_reference_correction,
+    build_tests_only_correction,
+    find_missing_test_references,
+    writes_only_tests,
+)
 from ai_factory.blocker_contract import (
     blocking_blockers,
     demote_deferred_blockers,
@@ -15,6 +21,7 @@ from ai_factory.generated_file_validation import (
     validate_generated_file,
 )
 from ai_factory.implementation_contract import (
+    ImplementationTaskKind,
     VerificationPolicy,
     default_verification_policy,
 )
@@ -866,6 +873,33 @@ def run_implementation_task(
             policy_corrections = build_missing_test_target_correction(
                 task_id=task.id,
                 missing_targets=missing_targets,
+            )
+
+            continue
+
+        missing_references = find_missing_test_references(
+            project_root,
+            {
+                file_change.path: file_change.content
+                for file_change in result.files
+                if file_change.operation != "delete"
+            },
+        )
+
+        if (
+            not is_last_attempt
+            and not retry_test_results
+            and task.kind is ImplementationTaskKind.IMPLEMENTATION
+            and writes_only_tests([file_change.path for file_change in result.files])
+        ):
+            policy_corrections = build_tests_only_correction(task.id)
+
+            continue
+
+        if missing_references and not is_last_attempt:
+            policy_corrections = build_missing_reference_correction(
+                task_id=task.id,
+                missing=missing_references,
             )
 
             continue
