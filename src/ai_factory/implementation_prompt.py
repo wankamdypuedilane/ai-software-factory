@@ -1,5 +1,6 @@
 from typing import Any
 
+from ai_factory.export_index import build_export_index
 from ai_factory.rework import format_rework_request
 
 from ai_factory.implementation_request import ImplementationTask
@@ -250,6 +251,23 @@ def build_implementation_prompt(
                 "when this task requires it.",
             ]
         )
+
+        export_index = build_export_index(workspace_files)
+
+        if export_index:
+            sections.extend(
+                [
+                    "",
+                    "### Export Index",
+                    "Every code module in the workspace and the names it "
+                    "exports, including modules whose content is omitted "
+                    "below. Import a name only from a module this index "
+                    "lists as exporting it; never guess which module "
+                    "defines a helper.",
+                    "",
+                    *export_index,
+                ]
+            )
 
         workspace_blocks, dropped_workspace = _budgeted_blocks(
             workspace_files,

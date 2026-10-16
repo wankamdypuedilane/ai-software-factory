@@ -866,7 +866,7 @@ def test_run_implementation_task_limits_retry_diagnostic_files(
     workspace_headings = [
         line
         for line in workspace_section.splitlines()
-        if line.startswith("### ")
+        if line.startswith("### ") and line != "### Export Index"
     ]
 
     assert len(workspace_headings) <= 8
