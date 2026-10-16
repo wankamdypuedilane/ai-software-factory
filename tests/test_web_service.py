@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -164,7 +165,8 @@ def test_settings_store_the_key_privately(tmp_path: Path, monkeypatch) -> None:
 
     assert settings["api_key_set"] is True
     assert "openai_api_key" not in settings
-    assert (tmp_path / "settings.json").stat().st_mode & 0o077 == 0
+    if os.name != "nt":  # Windows has no POSIX permission bits
+        assert (tmp_path / "settings.json").stat().st_mode & 0o077 == 0
 
 
 def test_a_failed_run_is_reported_not_raised(tmp_path: Path) -> None:
