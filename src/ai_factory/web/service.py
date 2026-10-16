@@ -177,6 +177,7 @@ class FactoryService:
         return {
             "provider": settings.get("provider", "openai"),
             "model": settings.get("model", "gpt-6-luna"),
+            "writing_model": settings.get("writing_model", ""),
             "api_key_set": bool(os.environ.get("OPENAI_API_KEY")),
             "workspace": str(self.workspace),
         }
@@ -195,6 +196,11 @@ class FactoryService:
 
         if isinstance(model, str) and model.strip():
             settings["model"] = model.strip()
+
+        writing_model = values.get("writing_model")
+
+        if isinstance(writing_model, str):
+            settings["writing_model"] = writing_model.strip()
 
         key = values.get("openai_api_key")
 
@@ -296,6 +302,12 @@ class FactoryService:
             if provider == "openai"
             else None
         )
+        if provider == "openai" and settings.get("writing_model"):
+            config["ai"]["models"] = {
+                "code": config["ai"]["model"],
+                "writing": settings["writing_model"],
+            }
+
         config["ui"] = {"profile": profile}
 
         save_state(config_path, config)

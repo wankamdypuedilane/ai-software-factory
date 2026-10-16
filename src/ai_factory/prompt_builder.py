@@ -1,6 +1,7 @@
 import json
 from typing import Any
 
+from ai_factory.state_digest import digest_state
 from ai_factory.rework import format_rework_request
 
 
@@ -94,9 +95,10 @@ def build_agent_prompt(
         "",
         "## Workflow State",
         json.dumps(
-            state,
+            digest_state(state, agent_name),
             indent=2,
             ensure_ascii=False,
+            default=str,
         ),
     ]
 

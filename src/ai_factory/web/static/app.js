@@ -185,9 +185,13 @@ async function showSettings() {
             <option value="mock" ${settings.provider === "mock" ? "selected" : ""}>Mode démo (sans IA, gratuit)</option>
           </select>
         </label>
-        <label class="field">Modèle OpenAI
+        <label class="field">Modèle pour écrire le code
           <input type="text" name="model" value="${esc(settings.model)}">
         </label>
+        <label class="field">Modèle pour les documents et les relectures (facultatif)
+          <input type="text" name="writing_model" value="${esc(settings.writing_model || "")}" placeholder="ex. gpt-5.4-mini — vide = même modèle partout">
+        </label>
+        <p class="muted">Le premier modèle écrit le code. Le second, moins cher, rédige les documents et fait les relectures : c'est là que part la plus grande partie des tokens.</p>
         <label class="field">Clé API OpenAI ${settings.api_key_set ? '<span class="tag ok">Enregistrée</span>' : '<span class="tag neutral">Absente</span>'}
           <input type="password" name="key" autocomplete="off" placeholder="${settings.api_key_set ? "Laisse vide pour garder la clé actuelle" : "sk-…"}">
         </label>
@@ -204,6 +208,7 @@ async function showSettings() {
       await api("POST", "/settings", {
         provider: form.provider.value,
         model: form.model.value,
+        writing_model: form.writing_model.value,
         openai_api_key: form.key.value,
       });
       document.getElementById("settings-msg").innerHTML = '<div class="notice warn" role="status">Réglages enregistrés. Ils s\'appliquent aux nouveaux projets.</div>';
