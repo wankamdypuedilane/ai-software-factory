@@ -137,6 +137,7 @@ class MockProvider(
                     {
                         "question": question,
                         "why": "It decides whether user accounts are needed.",
+                        "needs_owner_text": False,
                         "options": [
                             {
                                 "label": "Anyone, without an account",

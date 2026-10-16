@@ -193,3 +193,15 @@ def test_project_name_with_accents_is_reachable(tmp_path: Path) -> None:
 
     assert view["id"] == "reservations-salon"
     assert view["name"] == "Réservations Salon"
+
+
+def test_running_view_names_the_working_step(tmp_path: Path) -> None:
+    service = _service(tmp_path, ask_questions=False)
+    service.create_project("Busy", "Une idée suffisamment longue.", "novice")
+    service._job("busy").running = True
+    service._job("busy").started_at = "2026-10-16T03:00:00+00:00"
+
+    pending = service.project_view("busy")["pending"]
+
+    assert pending["kind"] == "running"
+    assert pending["started_at"] == "2026-10-16T03:00:00+00:00"

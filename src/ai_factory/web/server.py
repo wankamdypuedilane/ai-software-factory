@@ -268,9 +268,9 @@ def serve(
     )
     url = f"http://127.0.0.1:{server.server_address[1]}/"
 
-    print(f"AI Software Factory: {url}")
-    print(f"Projects folder: {service.workspace}")
-    print("Press Ctrl+C to stop.")
+    print(f"AI Software Factory: {url}", flush=True)
+    print(f"Projects folder: {service.workspace}", flush=True)
+    print("Press Ctrl+C to stop.", flush=True)
 
     if open_browser:
         webbrowser.open(url)

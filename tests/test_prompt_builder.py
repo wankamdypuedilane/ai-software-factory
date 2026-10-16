@@ -139,3 +139,34 @@ def test_build_agent_prompt_omits_agent_specific_instruction_for_other_agents() 
     prompt = build_agent_prompt(context)
 
     assert "## Agent-Specific Instruction" not in prompt
+
+
+def test_answered_questions_are_not_asked_again() -> None:
+    from ai_factory.prompt_builder import answered_questions_rules
+
+    assert answered_questions_rules("# Product Input\nIdea") == []
+
+    one_round = answered_questions_rules("## Answers\n- Q\n  Answer: A")
+    assert any("Never ask them again" in rule for rule in one_round)
+    assert not any("Do not return NEEDS_INPUT" in rule for rule in one_round)
+
+    two_rounds = answered_questions_rules(
+        "## Answers\n- Q1\n  Answer: A\n\n## Answers\n- Q2\n  Answer: B"
+    )
+    assert any("Do not return NEEDS_INPUT" in rule for rule in two_rounds)
+
+
+def test_agent_prompt_carries_the_answered_questions_rule() -> None:
+    from ai_factory.prompt_builder import build_agent_prompt
+
+    prompt = build_agent_prompt(
+        {
+            "agent_name": "product",
+            "contract": "Product contract",
+            "project": {},
+            "state": {},
+            "human_input": "Idea\n\n## Answers\n- Who?\n  Answer: Anyone",
+        }
+    )
+
+    assert "## Answered Questions" in prompt

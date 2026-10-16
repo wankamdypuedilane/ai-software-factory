@@ -2777,6 +2777,7 @@ def test_question_details_keep_exactly_one_recommendation() -> None:
         {"label": "E-mail", "detail": "Gratuit.", "recommended": True},
     ]
     assert details[1]["why"] == ""
+    assert details[0]["needs_owner_text"] is False
 
 
 def test_parse_result_merges_detailed_questions_into_questions(monkeypatch) -> None:
@@ -2813,3 +2814,50 @@ def test_parse_result_merges_detailed_questions_into_questions(monkeypatch) -> N
 
     assert result.questions == ["Quelle technique ?"]
     assert result.question_details[0]["options"][0]["recommended"] is True
+
+
+def test_question_details_keep_the_owner_text_flag() -> None:
+    from ai_factory.openai_provider import normalize_question_details
+
+    details = normalize_question_details(
+        [
+            {
+                "question": "Quels sont tes horaires ?",
+                "why": "Pour proposer les créneaux.",
+                "needs_owner_text": True,
+                "options": [
+                    {"label": "Valeurs d'exemple", "detail": "Mar-Sam 9h-18h, modifiable.", "recommended": True},
+                ],
+            }
+        ]
+    )
+
+    assert details[0]["needs_owner_text"] is True
+
+
+def test_agent_prompt_forbids_options_that_only_promise_information(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    provider = OpenAIProvider(model="test-model")
+    captured = {}
+
+    def fake_execute(prompt):
+        captured["prompt"] = prompt
+        raise RuntimeError("stop")
+
+    provider._execute = fake_execute
+
+    try:
+        provider.run(
+            {
+                "agent_name": "product",
+                "contract": "c",
+                "project": {},
+                "state": {},
+            }
+        )
+    except RuntimeError:
+        pass
+
+    assert "only promises information later" in captured["prompt"]
+    assert "needs_owner_text=true" in captured["prompt"]
+    assert "Never block a first version on business data" in captured["prompt"]

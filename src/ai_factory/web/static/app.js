@@ -91,13 +91,13 @@ async function showHome() {
         <h1>Qu'est-ce que tu veux construire&#8239;?</h1>
         <p class="lead">Décris ton idée avec tes mots. Une équipe d'agents (produit, design, architecture, code, tests, sécurité) te posera ses questions, puis construira le projet étape par étape. Tu valides chaque étape.</p>
       </div>
-      ${keyMissing ? '<div class="notice warn">Avant de commencer, ajoute ta clé OpenAI dans les <a href="#/settings">réglages</a>.</div>' : ""}
+      ${keyMissing ? '<div class="notice warn">Avant de commencer, ajoute ta clé OpenAI dans les <a href="#/settings">réglages</a>. Pour juste essayer, choisis le « Mode démo » dans les réglages : c\'est gratuit.</div>' : ""}
       <form class="card" id="new-project">
         <label class="field">Nom du projet
-          <input type="text" name="name" required maxlength="80" placeholder="Réservations Salon">
+          <input type="text" name="name" required maxlength="80" placeholder="Exemple : Réservations Salon">
         </label>
         <label class="field">Ton idée
-          <textarea name="idea" rows="5" required placeholder="Une application pour gérer les réservations de mon salon de coiffure : les clientes choisissent un créneau en ligne, je reçois une notification, et je vois mon planning de la semaine."></textarea>
+          <textarea name="idea" rows="5" required placeholder="Exemple : une application pour gérer les réservations de mon salon de coiffure. Les clientes choisissent un créneau en ligne, je reçois une notification et je vois mon planning de la semaine."></textarea>
         </label>
         <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">
           <legend class="field" style="font-weight:600;font-size:14px;margin-bottom:10px">Ton profil</legend>
@@ -233,6 +233,7 @@ async function refresh(id) {
     const changed = JSON.stringify(view) !== JSON.stringify(currentView);
     currentView = view;
     if (changed) renderProject(view);
+    app.querySelectorAll("[data-elapsed]").forEach((el) => { el.textContent = elapsedText(el.dataset.elapsed); });
     if (view.running) pollTimer = setTimeout(() => refresh(id), 2000);
   } catch (error) {
     pollTimer = setTimeout(() => refresh(id), 4000);
@@ -264,8 +265,9 @@ function renderProject(view) {
   if (p.kind === "running") {
     body = `
       <span class="badge run"><span class="spinner" aria-hidden="true"></span>Les agents travaillent</span>
-      <h1>Étape en cours…</h1>
-      <p class="lead">Ça prend généralement une à quelques minutes. Cette page se met à jour toute seule.</p>`;
+      <h1>${p.label ? esc(p.label) + " en cours…" : "Étape en cours…"}</h1>
+      <p class="lead">Ça prend généralement une à quelques minutes. Cette page se met à jour toute seule.</p>
+      ${p.started_at ? `<p class="muted" data-elapsed="${esc(p.started_at)}">${elapsedText(p.started_at)}</p>` : ""}`;
   } else if (p.kind === "questions") {
     body = `
       <span class="badge wait">${esc(p.label)} · des questions pour toi</span>
@@ -274,7 +276,10 @@ function renderProject(view) {
       <form id="answers" style="display:flex;flex-direction:column;gap:16px">
         ${p.questions.map((q, qi) => questionCard(q, qi)).join("")}
         <div id="action-error"></div>
-        <div class="row"><button type="submit" class="btn primary">Envoyer mes réponses</button></div>
+        <div class="row">
+          <button type="submit" class="btn primary">Envoyer mes réponses</button>
+          <button type="button" class="btn" data-let-decide>Laisser l'agent décider</button>
+        </div>
       </form>`;
   } else if (p.kind === "review") {
     body = `
@@ -342,9 +347,15 @@ function renderProject(view) {
   bindProjectActions(view);
 }
 
+function elapsedText(startedAt) {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
+  if (seconds < 60) return "Démarré il y a " + seconds + " s";
+  return "Démarré il y a " + Math.floor(seconds / 60) + " min " + (seconds % 60) + " s";
+}
+
 function questionCard(q, qi) {
   const options = (q.options || []).map((o, oi) => `
-    <button type="button" class="choice" data-q="${qi}" data-label="${esc(o.label)}" aria-pressed="${o.recommended ? "true" : "false"}">
+    <button type="button" class="choice" data-q="${qi}" data-label="${esc(o.label)}" data-detail="${esc(o.detail || "")}" aria-pressed="${o.recommended ? "true" : "false"}">
       <span class="row" style="gap:8px"><strong>${esc(o.label)}</strong>${o.recommended ? '<span class="tag ok">Recommandé</span>' : ""}</span>
       ${o.detail ? `<span>${esc(o.detail)}</span>` : ""}
     </button>`).join("");
@@ -353,9 +364,13 @@ function questionCard(q, qi) {
       <h2>${esc(q.question)}</h2>
       ${q.why ? `<p class="muted">${esc(q.why)}</p>` : ""}
       ${options ? `<div class="choices">${options}</div>` : ""}
-      <label class="field">${options ? "Ou ta propre réponse (facultatif)" : "Ta réponse"}
-        <input type="text" data-free="${qi}" ${options ? "" : "required"}>
-      </label>
+      ${q.needs_owner_text
+        ? `<label class="field">Ta réponse (c'est une information que toi seul connais)
+            <textarea data-free="${qi}" rows="4" placeholder="Écris-la ici, ou choisis une option ci-dessus."></textarea>
+          </label>`
+        : `<label class="field">${options ? "Ou ta propre réponse (facultatif)" : "Ta réponse"}
+            <input type="text" data-free="${qi}" ${options ? "" : "required"}>
+          </label>`}
     </section>`;
 }
 
@@ -400,6 +415,21 @@ function bindProjectActions(view) {
     });
   });
 
+  app.querySelectorAll("[data-let-decide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const collected = view.pending.questions.map((q) => {
+        const recommended = (q.options || []).find((o) => o.recommended);
+        return {
+          question: q.question,
+          answer: recommended
+            ? recommended.label + (recommended.detail ? " — " + recommended.detail : "") + " (the owner let the agent decide: this recommended option is final)"
+            : "The owner lets the agent decide: choose the safest, simplest option and record it as an assumption.",
+        };
+      });
+      act(button, "Envoi…", () => api("POST", `/projects/${id}/answers`, { agent: view.pending.agent, answers: collected }));
+    });
+  });
+
   const answers = document.getElementById("answers");
   if (answers) {
     answers.addEventListener("submit", (event) => {
@@ -408,7 +438,10 @@ function bindProjectActions(view) {
         const qi = card.dataset.question;
         const free = card.querySelector(`[data-free="${qi}"]`).value.trim();
         const picked = card.querySelector(`.choice[data-q="${qi}"][aria-pressed="true"]`);
-        return { question: card.dataset.text, answer: free || (picked ? picked.dataset.label : "") };
+        const chosen = picked
+          ? picked.dataset.label + (picked.dataset.detail ? " — " + picked.dataset.detail : "")
+          : "";
+        return { question: card.dataset.text, answer: free || chosen };
       });
       const submit = answers.querySelector('button[type="submit"]');
       act(submit, "Envoi…", () => api("POST", `/projects/${id}/answers`, { agent: view.pending.agent, answers: collected }));
