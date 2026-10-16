@@ -2957,3 +2957,31 @@ def test_insufficient_quota_is_not_retried(monkeypatch) -> None:
 
     assert calls["count"] == 1
     assert waits == []
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    [
+        {"type": "insufficient_quota"},
+        {"body": {"error": {"code": "insufficient_quota"}}},
+        {"message": "You exceeded your current quota, please check your plan and billing details."},
+        {"code": "billing_hard_limit_reached"},
+    ],
+)
+def test_quota_is_recognized_whatever_field_carries_it(attributes) -> None:
+    from ai_factory.openai_provider import classify_openai_error
+    from ai_factory.provider_errors import ProviderErrorKind
+
+    error = _rate_limit_error()
+
+    for name, value in attributes.items():
+        setattr(error, name, value)
+
+    assert classify_openai_error(error).kind is ProviderErrorKind.PERMANENT_REQUEST
+
+
+def test_a_plain_rate_limit_stays_retryable() -> None:
+    from ai_factory.openai_provider import classify_openai_error
+    from ai_factory.provider_errors import ProviderErrorKind
+
+    assert classify_openai_error(_rate_limit_error()).kind is not ProviderErrorKind.PERMANENT_REQUEST

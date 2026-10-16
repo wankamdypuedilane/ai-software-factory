@@ -94,6 +94,38 @@ def parses_provider_result(stage: str):
     return decorator
 
 
+QUOTA_CODES = {"insufficient_quota", "billing_hard_limit_reached", "billing_not_active"}
+QUOTA_MESSAGES = ("exceeded your current quota", "check your plan and billing", "billing details")
+
+
+def _is_insufficient_quota(error: Exception) -> bool:
+    """Whether a provider error means the account has no credit left.
+
+    A real run with a negative balance surfaced as RATE_LIMITED: the
+    code field alone is not reliable, so the type and the message are
+    checked too.
+    """
+
+    for field in ("code", "type"):
+        value = getattr(error, field, None)
+
+        if isinstance(value, str) and value in QUOTA_CODES:
+            return True
+
+    body = getattr(error, "body", None)
+
+    if isinstance(body, dict):
+        nested = body.get("error") if isinstance(body.get("error"), dict) else body
+
+        for field in ("code", "type"):
+            if nested.get(field) in QUOTA_CODES:
+                return True
+
+    message = str(getattr(error, "message", "") or error).lower()
+
+    return any(marker in message for marker in QUOTA_MESSAGES)
+
+
 def classify_openai_error(
     error: Exception,
 ) -> ProviderExecutionError:
@@ -101,7 +133,7 @@ def classify_openai_error(
 
     # An exhausted balance is reported as a 429 too, but waiting never
     # fixes it. The error code is a structured field of the response body.
-    if getattr(error, "code", None) == "insufficient_quota":
+    if _is_insufficient_quota(error):
         return ProviderExecutionError(
             kind=ProviderErrorKind.PERMANENT_REQUEST,
             message=(
