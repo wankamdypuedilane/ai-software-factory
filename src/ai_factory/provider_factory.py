@@ -43,6 +43,17 @@ def create_provider(
             models=models if isinstance(models, dict) else None,
         )
 
+    if provider_name == "claude-code":
+        from ai_factory.claude_code_provider import ClaudeCodeProvider
+
+        models = ai_config.get("models")
+
+        return ClaudeCodeProvider(
+            model=ai_config.get("model"),
+            settings=ai_config.get("settings") or {},
+            models=models if isinstance(models, dict) else None,
+        )
+
     raise ValueError(
         f"Unsupported AI provider: {provider_name}"
     )

@@ -51,13 +51,17 @@ def _kill_tree(process: subprocess.Popen) -> None:
         pass
 
 
-def run_shell_command(
-    command: str,
+def run_process(
+    args: str | list[str],
     cwd: Path,
     env: dict[str, str] | None,
     timeout: float,
+    *,
+    shell: bool = False,
+    input_text: str | None = None,
+    timeout_note: str | None = None,
 ) -> CommandOutcome:
-    """Run `command` through the shell; never wait past `timeout` + a drain."""
+    """Run a process; never wait past `timeout` plus a bounded drain."""
 
     kwargs: dict = {}
 
@@ -67,11 +71,11 @@ def run_shell_command(
         kwargs["start_new_session"] = True
 
     process = subprocess.Popen(
-        command,
+        args,
         cwd=cwd,
         env=env,
-        shell=True,
-        stdin=subprocess.DEVNULL,
+        shell=shell,
+        stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -81,14 +85,14 @@ def run_shell_command(
     )
 
     try:
-        stdout, stderr = process.communicate(timeout=timeout)
+        stdout, stderr = process.communicate(input=input_text, timeout=timeout)
         return CommandOutcome(process.returncode, stdout or "", stderr or "")
     except subprocess.TimeoutExpired:
         _kill_tree(process)
 
     try:
         stdout, stderr = process.communicate(timeout=PIPE_DRAIN_SECONDS)
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, ValueError):
         # A descendant escaped the kill and still holds the pipes: stop
         # reading rather than wait forever.
         for stream in (process.stdout, process.stderr):
@@ -99,7 +103,7 @@ def run_shell_command(
                 pass
         stdout, stderr = "", ""
 
-    note = (
+    note = timeout_note or (
         f"\n[Factory: the command did not finish within {int(timeout)} seconds "
         "and was stopped with every process it started. A test that never "
         "exits usually leaves something open: a database pool or client "
@@ -113,3 +117,14 @@ def run_shell_command(
         (stderr or "") + note,
         timed_out=True,
     )
+
+
+def run_shell_command(
+    command: str,
+    cwd: Path,
+    env: dict[str, str] | None,
+    timeout: float,
+) -> CommandOutcome:
+    """Run `command` through the shell; never wait past `timeout` + a drain."""
+
+    return run_process(command, cwd, env, timeout, shell=True)
