@@ -119,6 +119,10 @@ def run_next_agent(
 ) -> tuple[str, str]:
     """Determine and execute the next agent in the project workflow."""
 
+    # Providers that work in the project (Claude Code) need to know where.
+    if hasattr(provider, "project_root"):
+        provider.project_root = project_root
+
     with project_environment(project_root):
         return _run_next_agent(project_root, provider)
 

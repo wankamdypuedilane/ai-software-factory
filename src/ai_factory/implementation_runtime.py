@@ -768,9 +768,17 @@ def run_implementation_task(
             later_tasks=later_tasks,
         )
 
-        result = provider.implement(
-            prompt
-        )
+        # A provider that works in the project itself (Claude Code) writes,
+        # runs and fixes the task there; its changes still go through the
+        # transaction below like any other response.
+        implement_in_workspace = getattr(provider, "implement_in_workspace", None)
+
+        if callable(implement_in_workspace):
+            result = implement_in_workspace(prompt, project_root)
+        else:
+            result = provider.implement(
+                prompt
+            )
 
         if result.task_id != task.id:
             raise ValueError(

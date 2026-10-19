@@ -188,7 +188,7 @@ class FactoryService:
         provider = values.get("provider")
 
         if provider is not None:
-            if provider not in {"openai", "mock"}:
+            if provider not in {"openai", "mock", "claude-code"}:
                 raise ServiceError("Fournisseur inconnu.")
             settings["provider"] = provider
 
@@ -302,6 +302,11 @@ class FactoryService:
             if provider == "openai"
             else None
         )
+
+        if provider == "claude-code":
+            # Claude Code picks its own default model; nothing to name.
+            config["ai"]["model"] = None
+            config["ai"].pop("models", None)
         if provider == "openai" and settings.get("writing_model"):
             config["ai"]["models"] = {
                 "code": config["ai"]["model"],
@@ -871,6 +876,22 @@ def _blocking_reasons(last_result: dict[str, Any]) -> list[str]:
 
 
 FRIENDLY_ERRORS = (
+    (
+        "Claude usage limit reached",
+        "Ton abonnement Claude a atteint sa limite d'utilisation pour le "
+        "moment. Le travail fait est conservé : attends l'heure de remise à "
+        "zéro indiquée ci-dessous, puis clique sur « Relancer ».",
+    ),
+    (
+        "Claude Code is not signed in",
+        "Claude Code n'est pas connecté sur ce PC. Ouvre un terminal, tape "
+        "« claude », connecte-toi, puis clique sur « Relancer ».",
+    ),
+    (
+        "Claude Code is not installed",
+        "Claude Code n'est pas installé sur ce PC (ou introuvable). Installe-le "
+        "depuis code.claude.com, connecte-toi, puis clique sur « Relancer ».",
+    ),
     (
         "insufficient quota",
         "Ton compte OpenAI n'a plus de crédit. Ajoute du crédit dans "

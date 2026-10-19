@@ -182,6 +182,7 @@ async function showSettings() {
         <label class="field">Moteur d'IA
           <select name="provider">
             <option value="openai" ${settings.provider === "openai" ? "selected" : ""}>OpenAI</option>
+            <option value="claude-code" ${settings.provider === "claude-code" ? "selected" : ""}>Claude Code (ton abonnement Claude, sans clé)</option>
             <option value="mock" ${settings.provider === "mock" ? "selected" : ""}>Mode démo (sans IA, gratuit)</option>
           </select>
         </label>

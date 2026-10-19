@@ -239,3 +239,11 @@ def test_run_test_command_derives_the_database_name_from_the_project(
         captured["env"]["DATABASE_URL"]
         == "postgresql://user:password@localhost:5432/link_vault"
     )
+
+
+def test_validators_skip_commands_the_policy_refuses() -> None:
+    from ai_factory.test_command_policy import allowed_test_commands
+
+    assert allowed_test_commands(
+        ["python -m pytest", "python -m convertisseur 100 C F", "npm audit --audit-level=high", "rm -rf /"]
+    ) == ["python -m pytest", "npm audit --audit-level=high"]

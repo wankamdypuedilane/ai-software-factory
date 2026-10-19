@@ -10,6 +10,8 @@ ALLOWED_TEST_COMMANDS = {
 ALLOWED_TEST_COMMAND_PREFIXES = (
     "pytest",
     "python -m pytest",
+    # Read-only dependency audit used by the Security validator.
+    "npm audit",
 )
 
 ALLOWED_TARGETED_TEST_COMMAND_PREFIXES = (
@@ -63,3 +65,25 @@ def validate_test_command(
         raise ValueError(
             f"Unsafe shell syntax is not allowed in test command: {command}"
         )
+
+
+def allowed_test_commands(commands: list[str]) -> list[str]:
+    """The commands a validator may run; the others are skipped.
+
+    A real QA run declared `python -m convertisseur 100 C F` beside its
+    pytest commands, and the policy error stopped the whole step. Only
+    allowed commands count as evidence; a validator left with none fails
+    its evidence check, which explains itself.
+    """
+
+    allowed: list[str] = []
+
+    for command in commands:
+        try:
+            validate_test_command(command)
+        except ValueError:
+            continue
+
+        allowed.append(command)
+
+    return allowed

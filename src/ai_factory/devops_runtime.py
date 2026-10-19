@@ -1,3 +1,4 @@
+from ai_factory.test_command_policy import allowed_test_commands
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -78,7 +79,7 @@ def run_devops_validation(
             project_root=project_root,
             command=command,
         )
-        for command in result.test_commands
+        for command in allowed_test_commands(list(result.test_commands))
     ]
 
     return DevOpsExecution(
