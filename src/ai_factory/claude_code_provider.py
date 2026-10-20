@@ -68,6 +68,51 @@ IMPLEMENTATION_FINAL_SCHEMA = {
 }
 
 
+def find_claude_executable() -> str | None:
+    """Locate the `claude` CLI even when the server's PATH does not list it.
+
+    On Windows the native installer puts it in %USERPROFILE%\\.local\\bin, a
+    folder a terminal opened before the installation does not know; a real
+    run then reported Claude Code as missing although it was installed.
+    """
+
+    explicit = os.environ.get("CLAUDE_EXECUTABLE")
+
+    if explicit and Path(explicit).is_file():
+        return explicit
+
+    found = shutil.which("claude")
+
+    if found:
+        return found
+
+    home = Path.home()
+    candidates = [
+        home / ".local" / "bin" / "claude.exe",
+        home / ".local" / "bin" / "claude",
+        home / ".claude" / "local" / "claude.exe",
+        home / ".claude" / "local" / "claude",
+    ]
+
+    for variable in ("APPDATA", "LOCALAPPDATA"):
+        base = os.environ.get(variable)
+
+        if base:
+            candidates += [
+                Path(base) / "npm" / "claude.cmd",
+                Path(base) / "Programs" / "claude" / "claude.exe",
+                Path(base) / "Microsoft" / "WinGet" / "Links" / "claude.exe",
+            ]
+
+    candidates.append(Path("/usr/local/bin/claude"))
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+
+    return None
+
+
 @dataclass
 class _Snapshot:
     digests: dict[str, str]
@@ -220,7 +265,7 @@ class ClaudeCodeProvider(OpenAIProvider):
             if isinstance(role, str) and isinstance(name, str) and name.strip()
         }
         self._agent_name = None
-        self.executable = executable or self.settings.get("claude_executable") or shutil.which("claude")
+        self.executable = executable or self.settings.get("claude_executable") or find_claude_executable()
         self.project_root: Path | None = None
 
         if not self.executable:
