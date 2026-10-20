@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 import hashlib
 import os
 import shutil
+import time
 import sys
 import tempfile
 from pathlib import Path
@@ -384,8 +385,14 @@ class WorkspaceTransaction:
                 ignore_errors=True,
             )
 
-        if target.exists():
-            target.rename(previous)
+        if target.exists() and not _rename_with_retries(target, previous):
+            # Windows refuses to rename a directory while any file in it is
+            # open (antivirus, indexer, a node process). A real run stopped
+            # on "[WinError 5] Access denied" here. The installed files are
+            # copied over the existing directory instead: the unit already
+            # passed its tests with them.
+            _copy_over(source, target)
+            return
 
         try:
             shutil.move(
@@ -418,6 +425,45 @@ class WorkspaceTransaction:
             return _hash_file(target) != expected
         except OSError:
             return True
+
+
+RENAME_ATTEMPTS = 5
+RENAME_DELAY_SECONDS = 1.0
+
+
+def _rename_with_retries(source: Path, target: Path) -> bool:
+    """Rename, retrying while Windows holds a transient lock."""
+
+    for attempt in range(RENAME_ATTEMPTS):
+        try:
+            source.rename(target)
+            return True
+        except PermissionError:
+            if attempt + 1 < RENAME_ATTEMPTS:
+                time.sleep(RENAME_DELAY_SECONDS)
+        except OSError:
+            return False
+
+    return False
+
+
+def _copy_over(source: Path, target: Path) -> None:
+    """Copy every file of `source` into `target`, skipping locked files."""
+
+    for directory, _dirnames, filenames in os.walk(source):
+        relative = Path(directory).relative_to(source)
+        destination = target / relative
+
+        try:
+            destination.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+
+        for name in filenames:
+            try:
+                shutil.copy2(Path(directory) / name, destination / name)
+            except OSError:
+                continue
 
 
 def open_workspace_transaction(
