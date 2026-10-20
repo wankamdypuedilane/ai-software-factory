@@ -64,6 +64,19 @@ OWNER_LANGUAGE_RULE = (
     "paths and identifiers stay as they are."
 )
 
+VALIDATOR_LABELS = frozenset({"QA", "security", "DevOps", "SRE"})
+
+# A Claude Code QA wrote "I did not run any tests, this step cannot execute
+# commands" on a review the Factory had validated with executed tests.
+VALIDATOR_EXECUTION_RULE = (
+    "\n\n## How Your Checks Run\n"
+    "You read files here; you do not run commands yourself. The Factory "
+    "runs every command you list in test_commands right after your answer, "
+    "on the real project, and decides the gate from their results together "
+    "with your verdict. So list the commands that prove your verdict, and "
+    "do not report that tests were not run: they will be."
+)
+
 IMPLEMENTATION_FINAL_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -365,6 +378,9 @@ class ClaudeCodeProvider(OpenAIProvider):
         retry_max_output_tokens: Any = None,
     ) -> str:
         prompt += OWNER_LANGUAGE_RULE
+
+        if label in VALIDATOR_LABELS:
+            prompt += VALIDATOR_EXECUTION_RULE
 
         if schema is not None:
             prompt = (
