@@ -195,3 +195,16 @@ def test_claude_executable_can_be_named_explicitly(tmp_path: Path, monkeypatch) 
     monkeypatch.setenv("CLAUDE_EXECUTABLE", str(target))
 
     assert claude_code_provider.find_claude_executable() == str(target)
+
+
+def test_owner_facing_text_follows_the_language_of_the_idea(tmp_path: Path, monkeypatch) -> None:
+    log = tmp_path / "log.json"
+    monkeypatch.setenv("FAKE_LOG", str(log))
+    executable = _fake_claude(
+        tmp_path,
+        "print(json.dumps({'type': 'result', 'is_error': False, 'result': 'doc'}))\n",
+    )
+
+    ClaudeCodeProvider(executable=executable).generate("Écris le document.")
+
+    assert "French when they are in French" in json.loads(log.read_text(encoding="utf-8"))["prompt"]

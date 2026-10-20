@@ -54,6 +54,16 @@ LIMIT_MARKERS = (
 )
 AUTH_MARKERS = ("not logged in", "please run /login", "invalid api key", "authentication", "oauth")
 
+# The OpenAI models answered the owner in the language of the product
+# input; Claude Code wrote a French owner's review cards in English.
+OWNER_LANGUAGE_RULE = (
+    "\n\n## Language\n"
+    "Write every text meant for the project owner (summary, owner_summary, "
+    "questions, options, reasons) in the language of the product idea and "
+    "the human input above: French when they are in French. Code, file "
+    "paths and identifiers stay as they are."
+)
+
 IMPLEMENTATION_FINAL_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -354,6 +364,8 @@ class ClaudeCodeProvider(OpenAIProvider):
         max_output_tokens: Any = None,
         retry_max_output_tokens: Any = None,
     ) -> str:
+        prompt += OWNER_LANGUAGE_RULE
+
         if schema is not None:
             prompt = (
                 prompt
