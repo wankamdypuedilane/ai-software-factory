@@ -172,3 +172,26 @@ def test_a_weekly_limit_is_recognized_and_explained_in_french(tmp_path: Path) ->
     assert error.value.kind is ProviderErrorKind.RATE_LIMITED
     assert friendly_error(str(error.value)).startswith("Ton abonnement Claude a atteint sa limite")
     assert "resets 4pm" in friendly_error(str(error.value))
+
+
+def test_claude_is_found_in_the_native_install_folder(tmp_path: Path, monkeypatch) -> None:
+    from ai_factory import claude_code_provider
+
+    monkeypatch.delenv("CLAUDE_EXECUTABLE", raising=False)
+    monkeypatch.setattr(claude_code_provider.shutil, "which", lambda name: None)
+    monkeypatch.setattr(claude_code_provider.Path, "home", classmethod(lambda cls: tmp_path))
+    target = tmp_path / ".local" / "bin" / "claude.exe"
+    target.parent.mkdir(parents=True)
+    target.write_text("", encoding="utf-8")
+
+    assert claude_code_provider.find_claude_executable() == str(target)
+
+
+def test_claude_executable_can_be_named_explicitly(tmp_path: Path, monkeypatch) -> None:
+    from ai_factory import claude_code_provider
+
+    target = tmp_path / "my-claude.exe"
+    target.write_text("", encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_EXECUTABLE", str(target))
+
+    assert claude_code_provider.find_claude_executable() == str(target)
