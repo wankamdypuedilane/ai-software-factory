@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ai_factory.agent_inputs import append_agent_input
+from ai_factory.progress import read_progress
 from ai_factory.auto_diagnosis import HISTORY_FIELD, has_diagnosis_left, latest_diagnosis
 from ai_factory.approval_runtime import apply_approval
 from ai_factory.approvals import APPROVAL_BY_AGENT
@@ -713,12 +714,24 @@ class FactoryService:
         if job.running:
             agent = get_next_agent(state)
 
-            return {
+            running = {
                 "kind": "running",
                 "agent": agent,
                 "label": STEP_LABELS.get(agent or "", ""),
                 "started_at": job.started_at,
             }
+            progress = read_progress(self._project_root(project_id)) if project_id else None
+
+            # Only progress written during this run describes it.
+            if progress and job.started_at and str(progress.get("updated_at", "")) >= job.started_at:
+                running["progress"] = {
+                    "total": progress.get("total", 0),
+                    "current": progress.get("current"),
+                    "done": progress.get("done", [])[-8:],
+                    "done_count": len(progress.get("done", [])),
+                }
+
+            return running
 
         if state.get("project", {}).get("phase") == "completed":
             return {"kind": "completed"}

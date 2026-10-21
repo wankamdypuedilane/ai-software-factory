@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ai_factory.progress import ProgressRecorder
 from ai_factory.blocker_contract import (
     blocking_blockers,
 )
@@ -151,9 +152,11 @@ def run_implementation_batch(
     )
 
     batch = ImplementationBatchResult()
+    progress = ProgressRecorder(project_root, agent_name, tasks)
 
     for index, task in enumerate(tasks):
         task_retry_results = None
+        progress.start(index, task)
 
         if (
             retry_task_id is not None
@@ -189,12 +192,16 @@ def run_implementation_batch(
         # that fail-closed outcome semantics cannot relabel it.
         if blocking_blockers(result.blockers):
             batch.blocked = True
+            progress.finish(task, "blocked")
             break
 
         if not execution.execution_succeeded:
             batch.test_failed = True
             batch.failed_task_id = result.task_id
+            progress.finish(task, "failed")
             break
+
+        progress.finish(task, "done")
 
         # Only a unit whose transaction was promoted contributes files:
         # a discarded transaction wrote nothing to the workspace.

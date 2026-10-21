@@ -273,7 +273,8 @@ function renderProject(view) {
       <span class="badge run"><span class="spinner" aria-hidden="true"></span>Les agents travaillent</span>
       <h1>${p.label ? esc(p.label) + " en cours…" : "Étape en cours…"}</h1>
       <p class="lead">Ça prend généralement une à quelques minutes. Cette page se met à jour toute seule.</p>
-      ${p.started_at ? `<p class="muted" data-elapsed="${esc(p.started_at)}">${elapsedText(p.started_at)}</p>` : ""}`;
+      ${p.started_at ? `<p class="muted" data-elapsed="${esc(p.started_at)}">${elapsedText(p.started_at)}</p>` : ""}
+      ${progressCard(p.progress)}`;
   } else if (p.kind === "questions") {
     body = `
       <span class="badge wait">${esc(p.label)} · des questions pour toi</span>
@@ -387,6 +388,19 @@ function questionCard(q, qi) {
 function bulletCard(title, hint, items, tone) {
   if (!items || !items.length) return "";
   return `<section class="card ${tone || ""}"><h2>${esc(title)}</h2>${hint ? `<p class="muted">${esc(hint)}</p>` : ""}<ul class="plain-list">${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></section>`;
+}
+
+function progressCard(progress) {
+  if (!progress || !progress.total) return "";
+  const current = progress.current;
+  const outcome = { done: "✓", failed: "✗", blocked: "!" };
+  const done = (progress.done || []).map((task) =>
+    `<li>${outcome[task.outcome] || "•"} ${esc(task.title || task.id)}</li>`).join("");
+  return `<section class="card"><h2>Où en est l'agent</h2>
+    <p><strong>${progress.done_count} tâche${progress.done_count > 1 ? "s" : ""} terminée${progress.done_count > 1 ? "s" : ""} sur ${progress.total}</strong></p>
+    ${current ? `<p>En cours : <strong>${esc(current.title || current.id)}</strong> (tâche ${current.index} sur ${progress.total}) — <span data-elapsed="${esc(current.started_at)}">${elapsedText(current.started_at)}</span></p>` : ""}
+    ${done ? `<ul class="plain-list">${done}</ul>` : ""}
+  </section>`;
 }
 
 function autoFixes(list) {
